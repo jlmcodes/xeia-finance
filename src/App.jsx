@@ -97,7 +97,7 @@ const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isD
         onChange={handleChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        className={`w-28 text-right bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-[${COLORS.blueJeans}] focus:outline-none transition-colors text-sm dark:text-slate-200 ${
+        className={`w-28 text-right bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blueJeans focus:outline-none transition-colors text-sm dark:text-slate-200 ${
           (!isFocused && localStr.includes('(')) ? 'text-red-600 dark:text-red-400' : ''
         }`}
       />
@@ -667,7 +667,7 @@ export default function XeiaFinance() {
   };
 
   const SectionHeader = ({ title }) => (
-    <div className={`font-bold border-b-[1.5px] pb-1 mt-6 mb-2 text-sm uppercase tracking-wider ${isDarkMode ? `border-[${COLORS.goldenYellow}] text-[${COLORS.goldenYellow}]` : `border-[${COLORS.blueVelvet}] text-[${COLORS.blueVelvet}]`}`}>
+    <div className={`font-bold border-b-[1.5px] pb-1 mt-6 mb-2 text-sm uppercase tracking-wider ${isDarkMode ? `border-goldenYellow text-goldenYellow` : `border-blueVelvet text-blueVelvet`}`}>
       {title}
     </div>
   );
@@ -681,7 +681,7 @@ export default function XeiaFinance() {
               type="text"
               value={item.name ?? ''}
               onChange={(e) => handleItemChange(setState, category, item.id, 'name', e.target.value)}
-              className={`flex-1 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-[${COLORS.blueJeans}] focus:outline-none transition-colors text-sm dark:text-slate-200`}
+              className={`flex-1 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blueJeans focus:outline-none transition-colors text-sm dark:text-slate-200`}
               placeholder="Line Item Name"
             />
             <div className="flex items-center gap-4">
@@ -693,7 +693,7 @@ export default function XeiaFinance() {
             </div>
           </div>
         ))}
-        <button onClick={() => addItem(setState, category)} className={`text-xs hover:opacity-80 flex items-center gap-1 font-medium mt-1 text-[${COLORS.tangerine}]`}>
+        <button onClick={() => addItem(setState, category)} className={`text-xs hover:opacity-80 flex items-center gap-1 font-medium mt-1 text-tangerine`}>
           <Plus size={14} /> Add Line Item
         </button>
       </div>
@@ -735,9 +735,9 @@ export default function XeiaFinance() {
 
   const LinkedRow = ({ label, amount1, amount2 }) => {
     return (
-      <div className={`flex justify-between items-center py-1 text-sm border-y border-transparent ${isDarkMode ? `bg-[${COLORS.blueVelvet}]/30 text-slate-200` : `bg-[${COLORS.blueJeans}]/10`}`}>
+      <div className={`flex justify-between items-center py-1 text-sm border-y border-transparent ${isDarkMode ? `bg-blueVelvet/30 text-slate-200` : `bg-blueJeans/10`}`}>
         <span className="flex items-center gap-2 italic">
-          {label} <span className={`text-[10px] px-1.5 py-0.5 rounded-full not-italic ${isDarkMode ? `bg-[${COLORS.blueVelvet}] text-[${COLORS.goldenYellow}]` : `bg-[${COLORS.blueJeans}]/20 text-[${COLORS.blueVelvet}]`}`}>Auto</span>
+          {label} <span className={`text-[10px] px-1.5 py-0.5 rounded-full not-italic ${isDarkMode ? `bg-blueVelvet text-goldenYellow` : `bg-blueJeans/20 text-blueVelvet`}`}>Auto</span>
         </span>
         <div className="flex items-center gap-4">
           <CurrencyInput value={amount1 ?? 0} onChange={()=>{}} currencySymbol={currencySymbolStr} showSymbol={false} readOnly={true} />
@@ -751,11 +751,11 @@ export default function XeiaFinance() {
   // --- LOGIN SCREEN ---
   if (!isAuthenticated) {
     return (
-      <div className={`min-h-screen flex flex-col justify-center items-center bg-[${COLORS.blueVelvet}] text-slate-100 p-4`}>
+      <div className={`min-h-screen flex flex-col justify-center items-center bg-blueVelvet text-slate-100 p-4`}>
         <div className="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-2xl max-w-md w-full text-slate-800 dark:text-slate-100">
           <div className="flex items-center justify-center gap-3 mb-6">
-            <div className={`bg-[${COLORS.blueJeans}] text-white p-3 rounded-lg`}><Building2 size={28} /></div>
-            <h1 className={`text-2xl font-bold text-[${COLORS.blueVelvet}] dark:text-[${COLORS.goldenYellow}]`}>Xeia Finance</h1>
+            <div className={`bg-blueJeans text-white p-3 rounded-lg`}><Building2 size={28} /></div>
+            <h1 className={`text-2xl font-bold text-blueVelvet dark:text-goldenYellow`}>Xeia Finance</h1>
           </div>
           <h2 className="text-center font-semibold mb-6">Authorized Access Only</h2>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -767,14 +767,14 @@ export default function XeiaFinance() {
                   type="text" 
                   value={loginName ?? ''} 
                   onChange={(e) => setLoginName(e.target.value)} 
-                  className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md pl-10 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-[${COLORS.blueJeans}]`}
+                  className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md pl-10 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-blueJeans`}
                   placeholder="Enter authorized name..."
                   autoComplete="off"
                 />
               </div>
             </div>
             {loginError && <p className="text-red-500 text-sm">{loginError}</p>}
-            <button type="submit" className={`w-full bg-[${COLORS.tangerine}] hover:opacity-90 text-white font-bold py-2.5 rounded-md transition-opacity`}>
+            <button type="submit" className={`w-full bg-tangerine hover:opacity-90 text-white font-bold py-2.5 rounded-md transition-opacity`}>
               Access System
             </button>
           </form>
@@ -795,22 +795,22 @@ export default function XeiaFinance() {
         <header className={`bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between overflow-x-auto">
             <div className="flex items-center gap-2 mr-4">
-              <div className={`bg-[${COLORS.blueJeans}] text-white p-2 rounded-lg shrink-0`}><Building2 size={20} /></div>
-              <h1 className={`text-xl font-bold text-[${COLORS.blueVelvet}] dark:text-[${COLORS.goldenYellow}] whitespace-nowrap`}>Xeia Finance</h1>
+              <div className={`bg-blueJeans text-white p-2 rounded-lg shrink-0`}><Building2 size={20} /></div>
+              <h1 className={`text-xl font-bold text-blueVelvet dark:text-goldenYellow whitespace-nowrap`}>Xeia Finance</h1>
             </div>
             
             <div className="flex items-center gap-3 shrink-0">
               <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Toggle Dark Mode">
-                {isDarkMode ? <Sun size={18} className={`text-[${COLORS.goldenYellow}]`} /> : <Moon size={18} className={`text-[${COLORS.blueVelvet}]`} />}
+                {isDarkMode ? <Sun size={18} className={`text-goldenYellow`} /> : <Moon size={18} className={`text-blueVelvet`} />}
               </button>
               <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
 
               <button onClick={() => setIsConsolidated(!isConsolidated)} className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-medium transition-colors">
-                {isConsolidated ? <CheckSquare className={`text-[${COLORS.tangerine}]`} size={16}/> : <Square className="text-slate-400" size={16}/>}
+                {isConsolidated ? <CheckSquare className={`text-tangerine`} size={16}/> : <Square className="text-slate-400" size={16}/>}
                 Consolidated
               </button>
               <button onClick={() => setIsTwoYear(!isTwoYear)} className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-sm font-medium transition-colors">
-                {isTwoYear ? <ToggleRight className={`text-[${COLORS.tangerine}]`} size={18}/> : <ToggleLeft className="text-slate-400" size={18}/>}
+                {isTwoYear ? <ToggleRight className={`text-tangerine`} size={18}/> : <ToggleLeft className="text-slate-400" size={18}/>}
                 {isTwoYear ? '2-Year' : '1-Year'}
               </button>
               <select value={currency ?? ''} onChange={(e) => setCurrency(e.target.value)} className="bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-sm rounded-md px-2 py-1.5 focus:outline-none cursor-pointer">
@@ -821,17 +821,17 @@ export default function XeiaFinance() {
               <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
               
               <div className="flex gap-2 relative">
-                 <button onClick={handleSaveSession} className={`flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700 text-[${COLORS.blueVelvet}] dark:text-slate-200 hover:bg-slate-200 px-3 py-1.5 rounded-md border border-slate-300 font-medium text-sm transition-all`}>
+                 <button onClick={handleSaveSession} className={`flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700 text-blueVelvet dark:text-slate-200 hover:bg-slate-200 px-3 py-1.5 rounded-md border border-slate-300 font-medium text-sm transition-all`}>
                     <Save size={16} /> Save Backup 
                  </button>
 
-                 <label className={`flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700 text-[${COLORS.blueVelvet}] dark:text-slate-200 hover:bg-slate-200 px-3 py-1.5 rounded-md border border-slate-300 font-medium text-sm transition-all cursor-pointer`}>
+                 <label className={`flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700 text-blueVelvet dark:text-slate-200 hover:bg-slate-200 px-3 py-1.5 rounded-md border border-slate-300 font-medium text-sm transition-all cursor-pointer`}>
                     <Upload size={16} /> Load Backup
                     <input type="file" ref={fileInputRef} onChange={handleLoadSession} accept=".xeia,.json" className="hidden" />
                  </label>
               </div>
               
-              <button onClick={exportToExcel} disabled={isExportingExcel} className={`flex items-center gap-1.5 bg-[${COLORS.goldStars}]/10 text-[${COLORS.goldStars}] hover:bg-[${COLORS.goldStars}]/20 px-4 py-1.5 rounded-md border border-[${COLORS.goldStars}]/30 font-bold text-sm transition-all ml-2`}>
+              <button onClick={exportToExcel} disabled={isExportingExcel} className={`flex items-center gap-1.5 bg-goldStars/10 text-goldStars hover:bg-goldStars/20 px-4 py-1.5 rounded-md border border-goldStars/30 font-bold text-sm transition-all ml-2`}>
                 <FileSpreadsheet size={16} /> Export to Excel 
               </button>
             </div>
@@ -855,7 +855,7 @@ export default function XeiaFinance() {
                 key={tab.id} onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg font-medium transition-colors text-sm ${
                   activeTab === tab.id 
-                    ? `bg-white dark:bg-slate-800 text-[${COLORS.tangerine}] border-t-[3px] border-t-[${COLORS.tangerine}] border-l border-r border-slate-200 dark:border-slate-700 shadow-[0_4px_0_0_white] dark:shadow-[0_4px_0_0_#1e293b] -mb-[1px]` 
+                    ? `bg-white dark:bg-slate-800 text-tangerine border-t-[3px] border-t-tangerine border-l border-r border-slate-200 dark:border-slate-700 shadow-[0_4px_0_0_white] dark:shadow-[0_4px_0_0_#1e293b] -mb-[1px]` 
                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
@@ -870,7 +870,7 @@ export default function XeiaFinance() {
             {/* General Document Header */}
             {(activeTab !== 'tax' && activeTab !== 'payroll') && (
               <div className="mb-6">
-                <input type="text" value={companyName ?? ''} onChange={(e) => setCompanyName(e.target.value)} className={`text-2xl font-bold uppercase tracking-wide bg-transparent border-none focus:outline-none w-full ${isDarkMode ? `text-[${COLORS.goldenYellow}]` : `text-[${COLORS.blueVelvet}]`}`} placeholder="COMPANY NAME" />
+                <input type="text" value={companyName ?? ''} onChange={(e) => setCompanyName(e.target.value)} className={`text-2xl font-bold uppercase tracking-wide bg-transparent border-none focus:outline-none w-full ${isDarkMode ? `text-goldenYellow` : `text-blueVelvet`}`} placeholder="COMPANY NAME" />
                 <input type="text" value={dbaName ?? ''} onChange={(e) => setDbaName(e.target.value)} className="text-sm tracking-wide bg-transparent border-none focus:outline-none w-full text-slate-600 dark:text-slate-400" placeholder="Doing business under..." />
                 {isConsolidated && (
                   <div className={`text-sm font-bold uppercase tracking-wide border-b-[1.5px] border-slate-800 dark:border-slate-300 w-full text-slate-800 dark:text-slate-300 inline-block`}>
@@ -1029,7 +1029,7 @@ export default function XeiaFinance() {
             {activeTab === 'ratios' && (
               <div className="mb-16">
                 <div className="bg-slate-100 dark:bg-slate-700/50 p-4 rounded-lg mb-8 flex gap-8 items-center border border-slate-200 dark:border-slate-600">
-                  <span className="font-bold text-sm flex items-center gap-2"><Calculator size={16} className={`text-[${COLORS.tangerine}]`}/> Project Initial Investment <br/><span className="font-normal text-xs text-slate-500">(For ROI & Payback)</span></span>
+                  <span className="font-bold text-sm flex items-center gap-2"><Calculator size={16} className={`text-tangerine`}/> Project Initial Investment <br/><span className="font-normal text-xs text-slate-500">(For ROI & Payback)</span></span>
                   <div className="flex flex-col gap-2">
                     <label className="text-xs font-bold text-slate-500">{year1}</label>
                     <CurrencyInput value={ratioData.initialInvestment1 ?? 0} onChange={v => setRatioData({...ratioData, initialInvestment1: v})} currencySymbol={currencySymbolStr} />
@@ -1052,11 +1052,11 @@ export default function XeiaFinance() {
                     { label: 'Return on Investment', f1: (ni1/ratioData.initialInvestment1)*100, f2: (ni2/ratioData.initialInvestment2)*100, suffix: '%' },
                     { label: 'Payback Period', f1: ratioData.initialInvestment1/opCF1, f2: ratioData.initialInvestment2/opCF2, suffix: ' yrs' },
                   ].map((r, i) => (
-                    <div key={i} className={`border border-slate-200 dark:border-slate-600 rounded p-3 bg-slate-50 dark:bg-slate-700/30 border-l-4 border-l-[${COLORS.goldenYellow}]`}>
+                    <div key={i} className={`border border-slate-200 dark:border-slate-600 rounded p-3 bg-slate-50 dark:bg-slate-700/30 border-l-4 border-l-goldenYellow`}>
                       <div className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">{r.label}</div>
                       <div className="flex justify-between items-end">
                         <div>
-                          <div className={`font-black text-lg text-[${COLORS.blueVelvet}] dark:text-white`}>{isFinite(r.f1) ? r.f1.toFixed(2) : 'N/A'}{isFinite(r.f1) ? r.suffix : ''}</div>
+                          <div className={`font-black text-lg text-blueVelvet dark:text-white`}>{isFinite(r.f1) ? r.f1.toFixed(2) : 'N/A'}{isFinite(r.f1) ? r.suffix : ''}</div>
                           <div className="text-[10px] text-slate-400 font-bold">{year1}</div>
                         </div>
                         {isTwoYear && (
@@ -1143,7 +1143,7 @@ export default function XeiaFinance() {
             {/* 6. BIR TAX ENGINE */}
             {activeTab === 'tax' && (
               <div className="animate-in fade-in">
-                <h2 className={`text-2xl font-bold text-[${COLORS.blueVelvet}] dark:text-[${COLORS.goldenYellow}] mb-2 text-center`}>Bureau of Internal Revenue (BIR) Tax Engine</h2>
+                <h2 className={`text-2xl font-bold text-blueVelvet dark:text-goldenYellow mb-2 text-center`}>Bureau of Internal Revenue (BIR) Tax Engine</h2>
                 <p className="text-center text-slate-500 mb-8">Compute standard Philippine taxes using dynamic tables and rates.</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1163,7 +1163,7 @@ export default function XeiaFinance() {
                       <button
                         key={t.id}
                         onClick={() => { setActiveTaxSubTab(t.id); setSelectedFlatTax(''); }}
-                        className={`w-full text-left px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTaxSubTab === t.id ? `bg-[${COLORS.blueJeans}]/10 text-[${COLORS.blueJeans}] dark:text-[${COLORS.goldenYellow}] border border-[${COLORS.blueJeans}]/20` : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        className={`w-full text-left px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTaxSubTab === t.id ? `bg-blueJeans/10 text-blueJeans dark:text-goldenYellow border border-blueJeans/20` : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                       >
                         {t.label}
                       </button>
@@ -1172,14 +1172,14 @@ export default function XeiaFinance() {
 
                   <div className="col-span-3">
                     <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
-                      <h3 className={`font-bold text-lg mb-4 text-[${COLORS.blueVelvet}] dark:text-white capitalize`}>{activeTaxSubTab.replace('_', ' ')} Settings</h3>
+                      <h3 className={`font-bold text-lg mb-4 text-blueVelvet dark:text-white capitalize`}>{activeTaxSubTab.replace('_', ' ')} Settings</h3>
 
                       {activeTaxSubTab === 'income' ? (
                         <div>
                           <p className="text-xs text-slate-500 mb-4">Edit the graduated tax table brackets or use a flat corporate rate below.</p>
                           <div className="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-md mb-6">
                             <table className="w-full text-sm text-left">
-                              <thead className={`bg-[${COLORS.blueJeans}] text-white`}>
+                              <thead className={`bg-blueJeans text-white`}>
                                 <tr>
                                   <th className="px-3 py-2 font-semibold">Min (Over)</th>
                                   <th className="px-3 py-2 font-semibold">Max (Not Over)</th>
@@ -1240,7 +1240,7 @@ export default function XeiaFinance() {
                                 <input 
                                   type="radio" id={rate.id} name="taxCategory" value={rate.id} 
                                   checked={selectedFlatTax === rate.id} onChange={(e) => setSelectedFlatTax(e.target.value)}
-                                  className={`accent-[${COLORS.blueJeans}]`}
+                                  className={`accent-blueJeans`}
                                 />
                                 <label htmlFor={rate.id} className="flex-1 font-medium text-slate-700 dark:text-slate-300 cursor-pointer">{rate.name}</label>
                                 <div className="flex items-center gap-2">
@@ -1266,7 +1266,7 @@ export default function XeiaFinance() {
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Enter Tax Basis Amount (₱):</label>
                         <div className="flex gap-4 items-center">
                           <CurrencyInput value={taxBasisInput ?? 0} onChange={setTaxBasisInput} currencySymbol="₱" />
-                          <button onClick={calculateTax} className={`bg-[${COLORS.tangerine}] hover:opacity-90 text-white px-6 py-2 rounded-md font-medium transition-colors`}>
+                          <button onClick={calculateTax} className={`bg-tangerine hover:opacity-90 text-white px-6 py-2 rounded-md font-medium transition-colors`}>
                             Calculate & Add to Ledger
                           </button>
                         </div>
@@ -1281,7 +1281,7 @@ export default function XeiaFinance() {
                     ) : (
                       <div className="overflow-hidden border border-slate-200 dark:border-slate-700 rounded-lg">
                         <table className="w-full text-sm text-left">
-                          <thead className={`bg-[${COLORS.blueJeans}] text-white`}>
+                          <thead className={`bg-blueJeans text-white`}>
                             <tr>
                               <th className="px-4 py-3 font-semibold">Tax Name</th>
                               <th className="px-4 py-3 font-semibold text-right">Rate / Method</th>
@@ -1296,7 +1296,7 @@ export default function XeiaFinance() {
                                 <td className="px-4 py-3 font-medium">{t.name}</td>
                                 <td className="px-4 py-3 text-right text-slate-500 dark:text-slate-400 text-xs">{t.rateStr}</td>
                                 <td className="px-4 py-3 text-right font-mono">₱{t.basis.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                                <td className={`px-4 py-3 text-right font-bold text-[${COLORS.tangerine}] font-mono`}>₱{t.computed.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                                <td className={`px-4 py-3 text-right font-bold text-tangerine font-mono`}>₱{t.computed.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                                 <td className="px-4 py-3 text-center">
                                   <button onClick={() => setTaxLedger(taxLedger.filter(x => x.id !== t.id))} className="text-slate-400 hover:text-red-500"><Trash2 size={16}/></button>
                                 </td>
@@ -1322,7 +1322,7 @@ export default function XeiaFinance() {
             {/* 7. PAYROLL TAB */}
             {activeTab === 'payroll' && (
               <div className="animate-in fade-in">
-                <h2 className={`text-2xl font-bold text-[${COLORS.blueVelvet}] dark:text-[${COLORS.goldenYellow}] mb-2 text-center`}>Employee Payroll & Government Contributions</h2>
+                <h2 className={`text-2xl font-bold text-blueVelvet dark:text-goldenYellow mb-2 text-center`}>Employee Payroll & Government Contributions</h2>
                 <p className="text-center text-slate-500 mb-8">Compute gross pay, overtime, night differential, SSS, PhilHealth, and Pag-IBIG.</p>
 
                 <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700 mb-6 flex flex-wrap gap-6 items-center">
@@ -1351,7 +1351,7 @@ export default function XeiaFinance() {
                       setPayrollCols(prev => ({...prev, earnings: [...prev.earnings, {id, name: 'New Addition'}]}));
                       setEmployees(prev => prev.map(e => ({...e, earnings: {...e.earnings, [id]: 0}})));
                     }}
-                    className={`text-xs text-[${COLORS.blueJeans}] dark:text-[${COLORS.goldenYellow}] hover:opacity-80 flex items-center gap-1 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700`}
+                    className={`text-xs text-blueJeans dark:text-goldenYellow hover:opacity-80 flex items-center gap-1 font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700`}
                   >
                     <Plus size={12}/> Add Earning Column
                   </button>
@@ -1369,7 +1369,7 @@ export default function XeiaFinance() {
 
                 <div className="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
                   <table className="min-w-full text-xs text-left whitespace-nowrap">
-                    <thead className={`bg-[${COLORS.blueVelvet}] text-white`}>
+                    <thead className={`bg-blueVelvet text-white`}>
                       <tr>
                         <th className="px-3 py-3 font-semibold w-48">Employee Name</th>
                         <th className="px-3 py-3 font-semibold text-right">Base Pay ({payrollConfig.payBasis})</th>
@@ -1379,7 +1379,7 @@ export default function XeiaFinance() {
                         
                         {/* Dynamic Earnings Headers */}
                         {payrollCols.earnings.map(col => (
-                          <th key={col.id} className={`px-3 py-3 font-semibold text-right bg-[${COLORS.blueJeans}] border-l border-white/20 p-0`}>
+                          <th key={col.id} className={`px-3 py-3 font-semibold text-right bg-blueJeans border-l border-white/20 p-0`}>
                             <div className="flex items-center justify-end">
                               <input 
                                 type="text" value={col.name ?? ''} 
@@ -1398,7 +1398,7 @@ export default function XeiaFinance() {
                           </th>
                         ))}
                         
-                        <th className={`px-3 py-3 font-semibold text-right font-bold border-x border-white/20 bg-[${COLORS.goldStars}] text-white`}>Gross Pay</th>
+                        <th className={`px-3 py-3 font-semibold text-right font-bold border-x border-white/20 bg-goldStars text-white`}>Gross Pay</th>
                         
                         <th className="px-3 py-3 font-semibold text-right">SSS</th>
                         <th className="px-3 py-3 font-semibold text-right">PhilHealth</th>
@@ -1426,7 +1426,7 @@ export default function XeiaFinance() {
                           </th>
                         ))}
 
-                        <th className={`px-3 py-3 font-semibold text-right font-bold text-[${COLORS.blueVelvet}] bg-[${COLORS.goldenYellow}]`}>Net Pay</th>
+                        <th className={`px-3 py-3 font-semibold text-right font-bold text-blueVelvet bg-goldenYellow`}>Net Pay</th>
                         <th className="px-3 py-3 text-center"></th>
                       </tr>
                     </thead>
@@ -1461,7 +1461,7 @@ export default function XeiaFinance() {
 
                         return (
                           <tr key={emp.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
-                            <td className="px-3 py-3"><input type="text" value={emp.name ?? ''} onChange={e => updateEmp('name', e.target.value)} className={`w-full bg-transparent border-b border-transparent focus:border-[${COLORS.blueJeans}] focus:outline-none font-medium`}/></td>
+                            <td className="px-3 py-3"><input type="text" value={emp.name ?? ''} onChange={e => updateEmp('name', e.target.value)} className={`w-full bg-transparent border-b border-transparent focus:border-blueJeans focus:outline-none font-medium`}/></td>
                             <td className="px-3 py-3"><CurrencyInput value={emp.basePay ?? 0} onChange={v => updateEmp('basePay', v)} currencySymbol="" showSymbol={false} /></td>
                             <td className="px-3 py-3 text-right text-slate-500 dark:text-slate-400 font-mono">₱{daily.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
                             
@@ -1493,7 +1493,7 @@ export default function XeiaFinance() {
                               </td>
                             ))}
 
-                            <td className={`px-3 py-3 text-right font-bold text-[${COLORS.blueVelvet}] dark:text-white bg-[${COLORS.goldenYellow}]/20 font-mono`}>₱{netPay.toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                            <td className={`px-3 py-3 text-right font-bold text-blueVelvet dark:text-white bg-goldenYellow/20 font-mono`}>₱{netPay.toLocaleString('en-US', {minimumFractionDigits:2})}</td>
                             <td className="px-3 py-3 text-center"><button onClick={() => setEmployees(employees.filter(x => x.id !== emp.id))} className="text-slate-400 hover:text-red-500"><Trash2 size={14}/></button></td>
                           </tr>
                         );
@@ -1506,13 +1506,13 @@ export default function XeiaFinance() {
                   payrollCols.earnings.forEach(c => newEmp.earnings[c.id] = 0);
                   payrollCols.deductions.forEach(c => newEmp.deductions[c.id] = 0);
                   setEmployees([...employees, newEmp]);
-                }} className={`mt-4 text-sm text-[${COLORS.blueJeans}] dark:text-[${COLORS.goldenYellow}] hover:opacity-80 flex items-center gap-1 font-medium`}>
+                }} className={`mt-4 text-sm text-blueJeans dark:text-goldenYellow hover:opacity-80 flex items-center gap-1 font-medium`}>
                   <Plus size={16} /> Add Employee Row
                 </button>
 
                 {/* OT & ND Dedicated Calculator UI */}
                 <div className="mt-8 bg-slate-50 dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                  <h3 className={`font-bold text-lg mb-4 flex items-center gap-2 text-[${COLORS.blueJeans}] dark:text-[${COLORS.goldenYellow}]`}>
+                  <h3 className={`font-bold text-lg mb-4 flex items-center gap-2 text-blueJeans dark:text-goldenYellow`}>
                     <Calculator size={18} /> OT & ND Pay Calculator
                   </h3>
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
@@ -1576,7 +1576,7 @@ export default function XeiaFinance() {
                       <button 
                         onClick={postToPayroll}
                         disabled={!calcState.empId}
-                        className={`bg-[${COLORS.tangerine}] hover:opacity-90 disabled:bg-slate-300 disabled:text-slate-500 text-white font-medium px-3 py-1 rounded text-xs transition-colors`}
+                        className={`bg-tangerine hover:opacity-90 disabled:bg-slate-300 disabled:text-slate-500 text-white font-medium px-3 py-1 rounded text-xs transition-colors`}
                       >
                         Post Pay
                       </button>
@@ -1589,17 +1589,17 @@ export default function XeiaFinance() {
                   <div>
                     <SectionHeader title="Statutory Overtime & ND Multipliers (Reference)" />
                     <table className="w-full text-sm mt-4 border border-slate-200 dark:border-slate-700">
-                      <thead className={`bg-[${COLORS.blueJeans}] text-white`}>
+                      <thead className={`bg-blueJeans text-white`}>
                         <tr className="text-left text-xs font-bold">
                           <th className="px-4 py-2">Day of Work / Overtime</th>
                           <th className="px-4 py-2 text-right">Hourly Multiplier</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-700 text-xs">
-                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="px-4 py-2">Ordinary / Regular Day</td><td className={`px-4 py-2 text-right font-mono font-bold text-[${COLORS.tangerine}]`}>1.25</td></tr>
-                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="px-4 py-2">Rest Days or Special Holidays</td><td className={`px-4 py-2 text-right font-mono font-bold text-[${COLORS.tangerine}]`}>1.30</td></tr>
-                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="px-4 py-2">Special Holiday that is also a Rest Day</td><td className={`px-4 py-2 text-right font-mono font-bold text-[${COLORS.tangerine}]`}>1.50</td></tr>
-                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="px-4 py-2">Regular Holiday</td><td className={`px-4 py-2 text-right font-mono font-bold text-[${COLORS.tangerine}]`}>1.30</td></tr>
+                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="px-4 py-2">Ordinary / Regular Day</td><td className={`px-4 py-2 text-right font-mono font-bold text-tangerine`}>1.25</td></tr>
+                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="px-4 py-2">Rest Days or Special Holidays</td><td className={`px-4 py-2 text-right font-mono font-bold text-tangerine`}>1.30</td></tr>
+                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="px-4 py-2">Special Holiday that is also a Rest Day</td><td className={`px-4 py-2 text-right font-mono font-bold text-tangerine`}>1.50</td></tr>
+                        <tr className="hover:bg-slate-50 dark:hover:bg-slate-800"><td className="px-4 py-2">Regular Holiday</td><td className={`px-4 py-2 text-right font-mono font-bold text-tangerine`}>1.30</td></tr>
                         <tr className="bg-slate-50 dark:bg-slate-800/50"><td className="px-4 py-2 italic text-slate-500">Ordinary / Regular Night Shift (ND)</td><td className="px-4 py-2 text-right font-mono font-bold text-indigo-500">+ 10% (1.10)</td></tr>
                       </tbody>
                     </table>
@@ -1608,7 +1608,7 @@ export default function XeiaFinance() {
                   <div>
                     <SectionHeader title="Government Contribution Bases (Reference)" />
                     <table className="w-full text-sm mt-4 border border-slate-200 dark:border-slate-700">
-                      <thead className={`bg-[${COLORS.blueJeans}] text-white`}>
+                      <thead className={`bg-blueJeans text-white`}>
                         <tr className="text-left text-xs font-bold">
                           <th className="px-4 py-2">Agency</th>
                           <th className="px-4 py-2 text-right">EE Share %</th>
