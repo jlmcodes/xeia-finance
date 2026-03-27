@@ -751,8 +751,14 @@ export default function XeiaFinance() {
   // --- LOGIN SCREEN ---
   if (!isAuthenticated) {
     return (
-      <div className={`min-h-screen flex flex-col justify-center items-center bg-blueVelvet text-slate-100 p-4`}>
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-2xl max-w-md w-full text-slate-800 dark:text-slate-100">
+      <div 
+        className="min-h-screen flex flex-col justify-center items-center p-4 relative bg-cover bg-center"
+        style={{ backgroundImage: "url('/background.jpg')" }}
+      >
+        {/* This creates a sleek, semi-transparent dark blue overlay so the white login box still pops against the photo */}
+        <div className="absolute inset-0 bg-blueVelvet/80 z-0"></div>
+        
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-2xl max-w-md w-full text-slate-800 dark:text-slate-100 relative z-10">
             {/* --- UPDATED STACKED LOGO SECTION --- */}
             <div className="flex flex-col items-center justify-center mb-6 text-center">
               <img src="/logo-1.png" alt="Xeia Finance Logo" className="h-20 w-auto object-contain mb-3" />
@@ -798,9 +804,12 @@ export default function XeiaFinance() {
         {/* Top Header */}
         <header className={`bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between overflow-x-auto">
-            <div className="flex items-center gap-2 mr-4">
-              <div className={`bg-blueJeans text-white p-2 rounded-lg shrink-0`}><Building2 size={20} /></div>
-              <h1 className={`text-xl font-bold text-blueVelvet dark:text-goldenYellow whitespace-nowrap`}>Xeia Finance</h1>
+            <div className="flex items-center gap-3 mr-4">
+              <img src="/logo.png" alt="Xeia Finance Logo" className="h-10 w-auto object-contain shrink-0" />
+              <div className="flex flex-col">
+                <h1 className="text-xl font-bold text-blueVelvet dark:text-goldenYellow whitespace-nowrap leading-tight">Xeia Finance</h1>
+                <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Powered and Owned by Jaynard L. Monleon</span>
+              </div>
             </div>
             
             <div className="flex items-center gap-3 shrink-0">
