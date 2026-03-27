@@ -755,7 +755,7 @@ export default function XeiaFinance() {
         <div className="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-2xl max-w-md w-full text-slate-800 dark:text-slate-100">
             {/* --- UPDATED STACKED LOGO SECTION --- */}
             <div className="flex flex-col items-center justify-center mb-6 text-center">
-              <img src="/logo.png" alt="Xeia Finance Logo" className="h-16 w-auto object-contain mb-3" />
+              <img src="/logo-1.png" alt="Xeia Finance Logo" className="h-16 w-auto object-contain mb-3" />
               <h1 className="text-3xl font-bold text-blueVelvet dark:text-goldenYellow mb-1">Xeia Finance</h1>
               <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Powered and Owned by Jaynard L. Monleon</p>
             </div>
