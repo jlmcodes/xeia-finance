@@ -753,11 +753,14 @@ export default function XeiaFinance() {
     return (
       <div className={`min-h-screen flex flex-col justify-center items-center bg-blueVelvet text-slate-100 p-4`}>
         <div className="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-2xl max-w-md w-full text-slate-800 dark:text-slate-100">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className={`bg-blueJeans text-white p-3 rounded-lg`}><Building2 size={28} /></div>
-            <h1 className={`text-2xl font-bold text-blueVelvet dark:text-goldenYellow`}>Xeia Finance</h1>
-          </div>
-          <h2 className="text-center font-semibold mb-6">Authorized Access Only</h2>
+            <div className="flex flex-col items-center justify-center mb-6">
+              <div className="flex items-center justify-center gap-3 mb-1">
+                <div className="bg-blueJeans text-white p-3 rounded-lg"><Building2 size={28} /></div>
+                <h1 className="text-2xl font-bold text-blueVelvet dark:text-goldenYellow">Xeia Finance</h1>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Powered and Owned by Jaynard L. Monleon</p>
+            </div>
+            <h2 className="text-center font-semibold mb-6">Authorized Access Only</h2>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1 text-slate-600 dark:text-slate-400">Full Name</label>
