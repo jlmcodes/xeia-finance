@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Calculator, DollarSign, Building2, LineChart, FileText, PieChart, Receipt, FileSpreadsheet, ToggleLeft, ToggleRight, CheckSquare, Square, Users, Moon, Sun, Lock, Save, Upload } from 'lucide-react';
+import { Plus, Trash2, Calculator, DollarSign, Building2, LineChart, FileText, PieChart, Receipt, FileSpreadsheet, ToggleLeft, ToggleRight, CheckSquare, Square, Users, Moon, Sun, Lock, Save, Upload, Package, TrendingUp, Archive, BookOpen, PanelRightClose, ArrowRightCircle } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 
 // --- CONSTANTS & CONFIG ---
 const CURRENCIES = [
@@ -9,7 +10,7 @@ const CURRENCIES = [
   { code: 'GBP', name: 'British Pound', symbol: '£' },
 ];
 
-const AUTHORIZED_USERS = ['KSD Bellen', 'EJ Lacson', 'JL Monleon', 'ML Burgos', 'L Calvo'];
+const AUTHORIZED_USERS = ['KSD Bellen', 'EJ Lacson', 'JL Monleon', 'ML Burgos', 'L Calvo', 'IP Logroño'];
 
 const LEGAL_DISCLAIMER = "LEGAL DISCLAIMER: Any unauthorized distribution, reproduction, or dissemination of this link or its contents without the explicit notice and consent of the owner is considered illegal and strictly prohibited. Violators will be subject to appropriate legal action under the Intellectual Property Code of the Philippines (Republic Act No. 8293, Sec. 177).";
 
@@ -234,6 +235,49 @@ export default function XeiaFinance() {
     empId: '', dailyRate: 0, otHours: 0, otType: 1.25, ndHours: 0
   });
 
+  // --- NEW FEATURES STATES ---
+
+  // NOTES STATE
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [notesText, setNotesText] = useState('');
+
+  // PRODUCT COSTING STATE
+  const [costingData, setCostingData] = useState({
+    productId: '10015',
+    productName: 'Widget Y',
+    productDescription: 'A high-quality widget for various applications',
+    materials: [
+      { id: 1, desc: 'Steel', unit: 'Piece', qty: 100, unitCost: 5.00 },
+      { id: 2, desc: 'Plastic', unit: 'Piece', qty: 50, unitCost: 2.00 },
+      { id: 3, desc: 'Circuit Board', unit: 'Piece', qty: 25, unitCost: 10.00 }
+    ],
+    labor: [
+      { id: 1, desc: 'Assembly', hours: 10, hourlyRate: 20.00 },
+      { id: 2, desc: 'Testing', hours: 5, hourlyRate: 25.00 }
+    ],
+    overhead: [
+      { id: 1, desc: 'Factory Overhead', amount: 2000.00 }
+    ]
+  });
+
+  // SALES FORECAST STATE
+  const [forecastPeriods, setForecastPeriods] = useState(['Jul-16', 'Aug-16', 'Sep-16']);
+  const [forecastItems, setForecastItems] = useState([
+    { id: 1, name: 'ITEM 1', periods: { 'Jul-16': { price: 100, qty: 500 }, 'Aug-16': { price: 100, qty: 400 }, 'Sep-16': { price: 100, qty: 500 } } },
+    { id: 2, name: 'ITEM 2', periods: { 'Jul-16': { price: 50, qty: 1000 }, 'Aug-16': { price: 50, qty: 800 }, 'Sep-16': { price: 50, qty: 1000 } } }
+  ]);
+
+  // DEPRECIATION STATE
+  const [deprState, setDeprState] = useState({
+    assetName: 'Machinery',
+    cost: 50000,
+    salvage: 5000,
+    life: 5,
+    method: 'Straight Line'
+  });
+  const [deprSchedule, setDeprSchedule] = useState([]);
+
+
   // --- LOGIN LOGIC ---
   const handleLogin = (e) => {
     e.preventDefault();
@@ -253,7 +297,9 @@ export default function XeiaFinance() {
       companyName, dbaName, isConsolidated, isTwoYear, currency, year1, year2,
       splData, sceData, bsData, cfData, ratioData, 
       taxLedger, incomeTaxTable, flatTaxRates,
-      payrollConfig, payrollCols, employees
+      payrollConfig, payrollCols, employees,
+      // NEW FEATURES
+      costingData, forecastPeriods, forecastItems, deprState, deprSchedule, notesText
     };
     
     const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: "application/json" });
@@ -295,6 +341,14 @@ export default function XeiaFinance() {
         if(data.payrollConfig) setPayrollConfig(data.payrollConfig);
         if(data.payrollCols) setPayrollCols(data.payrollCols);
         if(data.employees) setEmployees(data.employees);
+
+        // NEW FEATURES
+        if(data.costingData) setCostingData(data.costingData);
+        if(data.forecastPeriods) setForecastPeriods(data.forecastPeriods);
+        if(data.forecastItems) setForecastItems(data.forecastItems);
+        if(data.deprState) setDeprState(data.deprState);
+        if(data.deprSchedule) setDeprSchedule(data.deprSchedule);
+        if(data.notesText) setNotesText(data.notesText);
 
         alert("Session Backup loaded successfully! All figures have been restored.");
       } catch(err) {
@@ -389,6 +443,102 @@ export default function XeiaFinance() {
       return emp;
     }));
   };
+
+  // --- NEW FEATURE CALCULATIONS ---
+
+  // Costing Calcs
+  const totalCostMaterials = costingData.materials.reduce((acc, m) => acc + (m.qty * m.unitCost), 0);
+  const totalCostLabor = costingData.labor.reduce((acc, l) => acc + (l.hours * l.hourlyRate), 0);
+  const totalCostOverhead = costingData.overhead.reduce((acc, o) => acc + Number(o.amount), 0);
+  const grandTotalProductionCost = totalCostMaterials + totalCostLabor + totalCostOverhead;
+
+  const postProductionCostToCOGS = () => {
+    setSplData(prev => ({
+      ...prev,
+      cogs: [...prev.cogs, { id: Date.now(), name: `Production Cost (${costingData.productName})`, amount1: grandTotalProductionCost, amount2: 0 }]
+    }));
+    alert("Production Cost successfully posted to Cost of Sales in SPL!");
+  };
+
+  // Forecast Calcs
+  const addForecastPeriod = () => {
+    const newPeriodName = `Period ${forecastPeriods.length + 1}`;
+    
+    // Ensure the auto-generated period name is unique
+    let finalPeriod = newPeriodName;
+    let counter = 1;
+    while(forecastPeriods.includes(finalPeriod)) {
+       finalPeriod = `Period ${forecastPeriods.length + 1 + counter}`;
+       counter++;
+    }
+    
+    setForecastPeriods([...forecastPeriods, finalPeriod]);
+    setForecastItems(forecastItems.map(item => ({
+      ...item,
+      periods: { ...item.periods, [finalPeriod]: { price: 0, qty: 0 } }
+    })));
+  };
+
+  const postForecastTotalToRevenue = () => {
+    // Computes sum of all periods for all items and posts to Revenue
+    let totalSales = 0;
+    forecastItems.forEach(item => {
+      forecastPeriods.forEach(p => {
+        const data = item.periods[p] || {price:0, qty:0};
+        totalSales += (data.price * data.qty);
+      });
+    });
+
+    setSplData(prev => ({
+      ...prev,
+      revenues: [...prev.revenues, { id: Date.now(), name: `Forecasted Sales Revenue`, amount1: totalSales, amount2: 0 }]
+    }));
+    alert("Total Forecasted Sales successfully posted to Revenues in SPL!");
+  };
+
+  // Depreciation Calcs
+  const generateDeprSchedule = () => {
+    const schedule = [];
+    let begBV = Number(deprState.cost);
+    const slnDepr = (Number(deprState.cost) - Number(deprState.salvage)) / Number(deprState.life);
+
+    for (let i = 1; i <= deprState.life; i++) {
+        let exp = 0;
+        if (deprState.method === 'Straight Line') {
+            exp = slnDepr;
+        } else if (deprState.method === 'Double Declining') {
+            exp = begBV * (2 / deprState.life);
+            if (begBV - exp < deprState.salvage) exp = begBV - deprState.salvage; 
+            if (i === deprState.life && begBV - exp > deprState.salvage) exp = begBV - deprState.salvage; 
+        }
+        const acc = (schedule[i - 2]?.accDepr || 0) + exp;
+        const endBV = begBV - exp;
+        schedule.push({ year: i, begBV, exp, accDepr: acc, endBV });
+        begBV = endBV;
+    }
+    setDeprSchedule(schedule);
+  };
+
+  const postDeprToSPL = (yearIndex) => {
+    if (!deprSchedule[yearIndex]) return;
+    const expAmount = deprSchedule[yearIndex].exp;
+    const accAmount = deprSchedule[yearIndex].accDepr;
+
+    setSplData(prev => ({
+      ...prev,
+      expenses: [...prev.expenses, { id: Date.now(), name: `Depreciation Expense - ${deprState.assetName} (Yr ${yearIndex+1})`, amount1: expAmount, amount2: 0 }]
+    }));
+    setBsData(prev => ({
+      ...prev,
+      nonCurrentAssets: [...prev.nonCurrentAssets, { id: Date.now(), name: `Accumulated Depr. - ${deprState.assetName}`, amount1: -accAmount, amount2: 0 }]
+    }));
+    setCfData(prev => ({
+      ...prev,
+      operating: [...prev.operating, { id: Date.now(), name: `Depreciation Add-back - ${deprState.assetName}`, amount1: expAmount, amount2: 0 }]
+    }));
+    alert(`Year ${yearIndex+1} Depreciation posted to Expenses, Accum. Depr (as negative asset), and CF Operating add-back!`);
+  };
+
 
   // --- TAX CALCULATION LOGIC ---
   const calculateTax = () => {
@@ -635,6 +785,384 @@ export default function XeiaFinance() {
       const tleRow = eqBsRow + 2;
       writeStyledTotal(bsSheet, tleRow, 'TOTAL LIABILITIES & EQUITY', `B${totLiabRow}+B${eqBsRow}`, `C${totLiabRow}+C${eqBsRow}`, true);
 
+      // --- START NEW EXPORT CODE FOR EXTRA TABS ---
+
+      // 5. ANALYSIS & RATIOS
+      const ratioSheet = setupSheet('Analysis & Ratios', 'FINANCIAL ANALYSIS & RATIOS');
+      let rRow = 8;
+      
+      const writeRatioRow = (label, v1, v2, suffix) => {
+          ratioSheet.getCell(`A${rRow}`).value = label;
+          ratioSheet.getCell(`B${rRow}`).value = isFinite(v1) ? `${v1.toFixed(2)}${suffix}` : 'N/A';
+          if (isTwoYear) ratioSheet.getCell(`C${rRow}`).value = isFinite(v2) ? `${v2.toFixed(2)}${suffix}` : 'N/A';
+          rRow++;
+      };
+
+      ratioSheet.getCell(`A${rRow}`).value = 'KEY FINANCIAL PERFORMANCE INDICATORS';
+      ratioSheet.getCell(`A${rRow}`).font = { bold: true, color: { argb: 'FF091D38' } };
+      rRow++;
+      writeRatioRow('Current Ratio', ca1/cl1, ca2/cl2, 'x');
+      writeRatioRow('Debt to Equity', tl1/endEq1, tl2/endEq2, 'x');
+      writeRatioRow('Net Profit Margin', (ni1/rev1)*100, (ni2/rev2)*100, '%');
+      writeRatioRow('Return on Assets', (ni1/ta1)*100, (ni2/ta2)*100, '%');
+      writeRatioRow('Return on Investment', (ni1/ratioData.initialInvestment1)*100, (ni2/ratioData.initialInvestment2)*100, '%');
+      writeRatioRow('Payback Period', ratioData.initialInvestment1/opCF1, ratioData.initialInvestment2/opCF2, ' yrs');
+      
+      rRow += 2;
+      if (isTwoYear) {
+          ratioSheet.getCell(`A${rRow}`).value = 'HORIZONTAL ANALYSIS (YoY Change)';
+          ratioSheet.getCell(`A${rRow}`).font = { bold: true, color: { argb: 'FF091D38' } };
+          rRow++;
+          ratioSheet.getCell(`A${rRow}`).value = 'Metric';
+          ratioSheet.getCell(`B${rRow}`).value = 'Amount Change';
+          ratioSheet.getCell(`C${rRow}`).value = '% Change';
+          ratioSheet.getRow(rRow).font = { bold: true };
+          rRow++;
+          
+          [
+            { n: 'Total Revenues', v1: rev1, v2: rev2 },
+            { n: 'Gross Profit', v1: gp1, v2: gp2 },
+            { n: 'Net Income', v1: ni1, v2: ni2 },
+            { n: 'Comprehensive Inc.', v1: compInc1, v2: compInc2 },
+            { n: 'Total Assets', v1: ta1, v2: ta2 },
+            { n: 'Total Liabilities', v1: tl1, v2: tl2 },
+            { n: 'Total Equity', v1: endEq1, v2: endEq2 },
+          ].forEach(row => {
+            const amtChange = row.v1 - row.v2;
+            const pctChange = row.v2 !== 0 ? (amtChange / row.v2) * 100 : 0;
+            ratioSheet.getCell(`A${rRow}`).value = row.n;
+            ratioSheet.getCell(`B${rRow}`).value = amtChange;
+            ratioSheet.getCell(`B${rRow}`).numFmt = '#,##0.00;[Red](#,##0.00)';
+            ratioSheet.getCell(`C${rRow}`).value = `${pctChange > 0 ? '+' : ''}${pctChange.toFixed(1)}%`;
+            rRow++;
+          });
+      }
+
+      rRow += 2;
+      ratioSheet.getCell(`A${rRow}`).value = `VERTICAL ANALYSIS (${year1})`;
+      ratioSheet.getCell(`A${rRow}`).font = { bold: true, color: { argb: 'FF091D38' } };
+      rRow++;
+      ratioSheet.getCell(`A${rRow}`).value = 'Metric';
+      ratioSheet.getCell(`B${rRow}`).value = '% of Base';
+      ratioSheet.getCell(`C${rRow}`).value = 'Base Used';
+      ratioSheet.getRow(rRow).font = { bold: true };
+      rRow++;
+      
+      [
+          { n: 'Cost of Sales', v: cogs1, base: rev1, baseN: 'Revenue' },
+          { n: 'Gross Profit', v: gp1, base: rev1, baseN: 'Revenue' },
+          { n: 'Operating Exp.', v: exp1, base: rev1, baseN: 'Revenue' },
+          { n: 'Net Income', v: ni1, base: rev1, baseN: 'Revenue' },
+          { n: 'Comprehensive Inc.', v: compInc1, base: rev1, baseN: 'Revenue' },
+          { n: 'Current Assets', v: ca1, base: ta1, baseN: 'Total Assets' },
+          { n: 'Total Liabilities', v: tl1, base: ta1, baseN: 'Total Assets' },
+      ].forEach(row => {
+          ratioSheet.getCell(`A${rRow}`).value = row.n;
+          ratioSheet.getCell(`B${rRow}`).value = `${row.base !== 0 ? ((row.v / row.base) * 100).toFixed(1) : '0.0'}%`;
+          ratioSheet.getCell(`C${rRow}`).value = row.baseN;
+          rRow++;
+      });
+      
+      rRow += 2;
+      ratioSheet.getCell(`A${rRow}`).value = '* NOTE: Graphical Representations inside the web app use this data tabular format.';
+      ratioSheet.getCell(`A${rRow}`).font = { italic: true, size: 10, color: { argb: 'FF64748B' } };
+
+
+      // 6. BIR TAXES
+      const taxSheet = wb.addWorksheet('BIR Taxes');
+      taxSheet.columns = [{ width: 40 }, { width: 30 }, { width: 20 }, { width: 20 }];
+      styleHeader(taxSheet.getCell('A1'), companyName, true);
+      taxSheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF214573' } };
+      taxSheet.getCell('A2').value = dbaName;
+      taxSheet.getCell('A3').value = subtitleText;
+      taxSheet.getCell('A5').value = `${titlePrefix}BIR TAX COMPUTATIONS`;
+      taxSheet.getCell('A5').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      
+      const taxHeader = taxSheet.getRow(7);
+      taxHeader.values = ['TAX NAME', 'RATE / METHOD', 'TAX BASIS', 'COMPUTED TAX'];
+      taxHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      taxHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF214573' } };
+      
+      let tRow = 8;
+      taxLedger.forEach(t => {
+          taxSheet.getCell(`A${tRow}`).value = t.name;
+          taxSheet.getCell(`B${tRow}`).value = t.rateStr;
+          taxSheet.getCell(`C${tRow}`).value = t.basis;
+          taxSheet.getCell(`C${tRow}`).numFmt = '#,##0.00;[Red](#,##0.00)';
+          taxSheet.getCell(`D${tRow}`).value = t.computed;
+          taxSheet.getCell(`D${tRow}`).numFmt = '#,##0.00;[Red](#,##0.00)';
+          tRow++;
+      });
+      
+      taxSheet.getCell(`C${tRow}`).value = 'Total Tax Liability:';
+      taxSheet.getCell(`C${tRow}`).font = { bold: true };
+      taxSheet.getCell(`D${tRow}`).value = sum(taxLedger, 'computed');
+      taxSheet.getCell(`D${tRow}`).font = { bold: true };
+      taxSheet.getCell(`D${tRow}`).numFmt = '#,##0.00;[Red](#,##0.00)';
+
+
+      // 7. PAYROLL
+      const paySheet = wb.addWorksheet('Payroll');
+      const payCols = [
+          { header: 'EMPLOYEE NAME', key: 'name', width: 25 },
+          { header: 'BASE PAY', key: 'base', width: 15 },
+          { header: 'DAILY RATE', key: 'daily', width: 15 },
+          { header: 'OT PAY', key: 'ot', width: 15 },
+          { header: 'ND PAY', key: 'nd', width: 15 }
+      ];
+      payrollCols.earnings.forEach(col => payCols.push({ header: col.name.toUpperCase(), key: `earn_${col.id}`, width: 15 }));
+      payCols.push({ header: 'GROSS PAY', key: 'gross', width: 15 });
+      payCols.push(
+          { header: 'SSS', key: 'sss', width: 12 },
+          { header: 'PHILHEALTH', key: 'ph', width: 12 },
+          { header: 'PAG-IBIG', key: 'hdmf', width: 12 },
+          { header: 'TAX (WHT)', key: 'wht', width: 12 }
+      );
+      payrollCols.deductions.forEach(col => payCols.push({ header: col.name.toUpperCase(), key: `ded_${col.id}`, width: 15 }));
+      payCols.push({ header: 'NET PAY', key: 'net', width: 15 });
+      
+      paySheet.columns = payCols.map(c => ({ width: c.width }));
+      
+      styleHeader(paySheet.getCell('A1'), companyName, true);
+      paySheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF214573' } };
+      paySheet.getCell('A2').value = dbaName;
+      paySheet.getCell('A3').value = subtitleText;
+      paySheet.getCell('A5').value = `${titlePrefix}EMPLOYEE PAYROLL REGISTER`;
+      paySheet.getCell('A5').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      
+      const pHeaderRow = paySheet.getRow(7);
+      pHeaderRow.values = payCols.map(c => c.header);
+      pHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      pHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF214573' } };
+
+      let pRow = 8;
+      employees.forEach(emp => {
+          const { daily } = getEmpRates(emp.basePay);
+          const customEarnSum = Object.values(emp.earnings || {}).reduce((a,b)=>a+(Number(b)||0), 0);
+          const grossPay = (emp.basePay || 0) + (emp.otPay || 0) + (emp.ndPay || 0) + customEarnSum; 
+          const statutoryDeduct = (emp.sss || 0) + (emp.philhealth || 0) + (emp.pagibig || 0) + (emp.withholding || 0);
+          const customDedSum = Object.values(emp.deductions || {}).reduce((a,b)=>a+(Number(b)||0), 0);
+          const netPay = grossPay - statutoryDeduct - customDedSum;
+
+          const rowData = [
+              emp.name, emp.basePay, daily, emp.otPay, emp.ndPay
+          ];
+          payrollCols.earnings.forEach(col => rowData.push((emp.earnings || {})[col.id] || 0));
+          rowData.push(grossPay, emp.sss, emp.philhealth, emp.pagibig, emp.withholding);
+          payrollCols.deductions.forEach(col => rowData.push((emp.deductions || {})[col.id] || 0));
+          rowData.push(netPay);
+          
+          paySheet.getRow(pRow).values = rowData;
+          for(let c=2; c<=rowData.length; c++) {
+              paySheet.getCell(pRow, c).numFmt = '#,##0.00;[Red](#,##0.00)';
+          }
+          pRow++;
+      });
+
+
+      // 8. PRODUCT COSTING
+      const costSheet = wb.addWorksheet('Product Costing');
+      costSheet.columns = [{ width: 30 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 20 }];
+      styleHeader(costSheet.getCell('A1'), companyName, true);
+      costSheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF214573' } };
+      costSheet.getCell('A2').value = dbaName;
+      costSheet.getCell('A5').value = `${titlePrefix}PRODUCT COSTING TEMPLATE`;
+      costSheet.getCell('A5').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      
+      costSheet.getCell('A7').value = 'Product ID:';
+      costSheet.getCell('B7').value = costingData.productId;
+      costSheet.getCell('A8').value = 'Product Name:';
+      costSheet.getCell('B8').value = costingData.productName;
+      costSheet.getCell('A9').value = 'Description:';
+      costSheet.getCell('B9').value = costingData.productDescription;
+
+      let cRow = 11;
+      // Materials
+      costSheet.getCell(`A${cRow}`).value = 'MATERIALS';
+      costSheet.getCell(`A${cRow}`).font = { bold: true, color: { argb: 'FF091D38' } };
+      cRow++;
+      costSheet.getRow(cRow).values = ['Description', 'Unit', 'Quantity', 'Unit Cost', 'Total Cost'];
+      costSheet.getRow(cRow).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      costSheet.getRow(cRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } }; 
+      cRow++;
+      costingData.materials.forEach(m => {
+          costSheet.getRow(cRow).values = [m.desc, m.unit, m.qty, m.unitCost, m.qty * m.unitCost];
+          costSheet.getCell(`C${cRow}`).numFmt = '#,##0.00';
+          costSheet.getCell(`D${cRow}`).numFmt = '#,##0.00';
+          costSheet.getCell(`E${cRow}`).numFmt = '#,##0.00';
+          cRow++;
+      });
+      costSheet.getCell(`D${cRow}`).value = 'Total Materials:';
+      costSheet.getCell(`E${cRow}`).value = totalCostMaterials;
+      costSheet.getCell(`E${cRow}`).numFmt = '#,##0.00';
+      costSheet.getRow(cRow).font = { bold: true };
+      
+      cRow += 2;
+      // Labor
+      costSheet.getCell(`A${cRow}`).value = 'LABOR';
+      costSheet.getCell(`A${cRow}`).font = { bold: true, color: { argb: 'FF091D38' } };
+      cRow++;
+      costSheet.getRow(cRow).values = ['Description', 'Hours', '', 'Hourly Rate', 'Total Cost'];
+      costSheet.getRow(cRow).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      costSheet.getRow(cRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } }; 
+      cRow++;
+      costingData.labor.forEach(l => {
+          costSheet.getRow(cRow).values = [l.desc, l.hours, '', l.hourlyRate, l.hours * l.hourlyRate];
+          costSheet.getCell(`B${cRow}`).numFmt = '#,##0.00';
+          costSheet.getCell(`D${cRow}`).numFmt = '#,##0.00';
+          costSheet.getCell(`E${cRow}`).numFmt = '#,##0.00';
+          cRow++;
+      });
+      costSheet.getCell(`D${cRow}`).value = 'Total Labor:';
+      costSheet.getCell(`E${cRow}`).value = totalCostLabor;
+      costSheet.getCell(`E${cRow}`).numFmt = '#,##0.00';
+      costSheet.getRow(cRow).font = { bold: true };
+      
+      cRow += 2;
+      // Overhead
+      costSheet.getCell(`A${cRow}`).value = 'OVERHEAD';
+      costSheet.getCell(`A${cRow}`).font = { bold: true, color: { argb: 'FF091D38' } };
+      cRow++;
+      costSheet.getRow(cRow).values = ['Description', '', '', '', 'Total Cost'];
+      costSheet.getRow(cRow).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      costSheet.getRow(cRow).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF59E0B' } }; 
+      cRow++;
+      costingData.overhead.forEach(o => {
+          costSheet.getRow(cRow).values = [o.desc, '', '', '', o.amount];
+          costSheet.getCell(`E${cRow}`).numFmt = '#,##0.00';
+          cRow++;
+      });
+      costSheet.getCell(`D${cRow}`).value = 'Total Overhead:';
+      costSheet.getCell(`E${cRow}`).value = totalCostOverhead;
+      costSheet.getCell(`E${cRow}`).numFmt = '#,##0.00';
+      costSheet.getRow(cRow).font = { bold: true };
+      
+      cRow += 2;
+      costSheet.getCell(`D${cRow}`).value = 'GRAND TOTAL PRODUCTION COST:';
+      costSheet.getCell(`E${cRow}`).value = grandTotalProductionCost;
+      costSheet.getCell(`E${cRow}`).numFmt = '#,##0.00';
+      costSheet.getRow(cRow).font = { bold: true, size: 12 };
+      
+      cRow += 2;
+      costSheet.getCell(`A${cRow}`).value = '* NOTE: Costing Graphical Representation inside the web app uses these specific total material, labor, and overhead figures to build the chart.';
+      costSheet.getCell(`A${cRow}`).font = { italic: true, size: 10, color: { argb: 'FF64748B' } };
+
+
+      // 9. SALES FORECAST
+      const sfSheet = wb.addWorksheet('Sales Forecast');
+      const sfCols = [{ width: 25 }, { width: 15 }];
+      forecastPeriods.forEach(() => sfCols.push({ width: 15 }));
+      sfCols.push({ width: 20 });
+      sfSheet.columns = sfCols;
+      
+      styleHeader(sfSheet.getCell('A1'), companyName, true);
+      sfSheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF214573' } };
+      sfSheet.getCell('A2').value = dbaName;
+      sfSheet.getCell('A5').value = `${titlePrefix}SALES FORECAST TEMPLATE`;
+      sfSheet.getCell('A5').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      
+      const sfHeader = sfSheet.getRow(7);
+      const sfH = ['PRODUCT NAME', 'METRIC'];
+      forecastPeriods.forEach(p => sfH.push(p));
+      sfH.push('TOTAL');
+      sfHeader.values = sfH;
+      sfHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      sfHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF214573' } };
+      
+      let sRow = 8;
+      forecastItems.forEach(item => {
+          let itemTotal = 0;
+          forecastPeriods.forEach(p => {
+             itemTotal += ((item.periods[p]?.price || 0) * (item.periods[p]?.qty || 0));
+          });
+          
+          const pRowData = [item.name, 'PRICE'];
+          const qRowData = ['', 'UNITS'];
+          const tRowData = ['', 'TOTAL SALES'];
+          
+          forecastPeriods.forEach(p => {
+              pRowData.push(item.periods[p]?.price || 0);
+              qRowData.push(item.periods[p]?.qty || 0);
+              tRowData.push((item.periods[p]?.price || 0) * (item.periods[p]?.qty || 0));
+          });
+          
+          pRowData.push('');
+          qRowData.push('');
+          tRowData.push(itemTotal);
+          
+          sfSheet.getRow(sRow).values = pRowData;
+          sfSheet.getRow(sRow+1).values = qRowData;
+          sfSheet.getRow(sRow+2).values = tRowData;
+          sfSheet.getRow(sRow+2).font = { bold: true };
+          
+          for(let c=3; c<=pRowData.length; c++) {
+              sfSheet.getCell(sRow, c).numFmt = '#,##0.00';
+              sfSheet.getCell(sRow+1, c).numFmt = '#,##0';
+              sfSheet.getCell(sRow+2, c).numFmt = '#,##0.00';
+          }
+          sRow += 4;
+      });
+      
+      const grandTotalRow = sfSheet.getRow(sRow);
+      const gtVals = ['GRAND TOTAL SALES (CHART DATA)', ''];
+      let absoluteGT = 0;
+      forecastPeriods.forEach(p => {
+          let colTotal = 0;
+          forecastItems.forEach(item => {
+            colTotal += (item.periods[p]?.price || 0) * (item.periods[p]?.qty || 0);
+          });
+          gtVals.push(colTotal);
+          absoluteGT += colTotal;
+      });
+      gtVals.push(absoluteGT);
+      grandTotalRow.values = gtVals;
+      grandTotalRow.font = { bold: true, size: 12 };
+      for(let c=3; c<=gtVals.length; c++) {
+          grandTotalRow.getCell(c).numFmt = '#,##0.00';
+      }
+      
+      sRow += 2;
+      sfSheet.getCell(`A${sRow}`).value = '* NOTE: To visualize this forecast, highlight the "GRAND TOTAL SALES" row (starting from column C) and click Insert -> Chart in Excel. This mirrors the line chart inside the web app.';
+      sfSheet.getCell(`A${sRow}`).font = { italic: true, size: 10, color: { argb: 'FF64748B' } };
+
+
+      // 10. DEPRECIATION
+      const deprSheet = wb.addWorksheet('Depreciation');
+      deprSheet.columns = [{ width: 15 }, { width: 20 }, { width: 20 }, { width: 20 }, { width: 20 }];
+      styleHeader(deprSheet.getCell('A1'), companyName, true);
+      deprSheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF214573' } };
+      deprSheet.getCell('A2').value = dbaName;
+      deprSheet.getCell('A5').value = `${titlePrefix}DEPRECIATION SCHEDULE`;
+      deprSheet.getCell('A5').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      
+      deprSheet.getCell('A7').value = 'Asset Name:';
+      deprSheet.getCell('B7').value = deprState.assetName;
+      deprSheet.getCell('A8').value = 'Cost:';
+      deprSheet.getCell('B8').value = deprState.cost;
+      deprSheet.getCell('B8').numFmt = '#,##0.00';
+      deprSheet.getCell('A9').value = 'Salvage Value:';
+      deprSheet.getCell('B9').value = deprState.salvage;
+      deprSheet.getCell('B9').numFmt = '#,##0.00';
+      deprSheet.getCell('A10').value = 'Useful Life:';
+      deprSheet.getCell('B10').value = `${deprState.life} Years`;
+      deprSheet.getCell('A11').value = 'Method:';
+      deprSheet.getCell('B11').value = deprState.method;
+
+      const dHeader = deprSheet.getRow(13);
+      dHeader.values = ['YEAR', 'BEG. BOOK VALUE', 'DEPR. EXPENSE', 'ACCUM. DEPR.', 'END BOOK VALUE'];
+      dHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      dHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF214573' } };
+      
+      let dRow = 14;
+      deprSchedule.forEach(row => {
+          deprSheet.getRow(dRow).values = [row.year, row.begBV, row.exp, row.accDepr, row.endBV];
+          for(let c=2; c<=5; c++) {
+              deprSheet.getCell(dRow, c).numFmt = '#,##0.00';
+          }
+          dRow++;
+      });
+      // --- END NEW EXPORT CODE ---
+
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
@@ -799,7 +1327,29 @@ export default function XeiaFinance() {
   // --- RENDER MAIN APP ---
   return (
     <div className={`${isDarkMode ? 'dark' : ''}`}>
-      <div className={`min-h-screen font-sans pb-20 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200`}>
+      <div className={`min-h-screen font-sans pb-20 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 relative`}>
+
+        {/* --- FLOATING COLLAPSIBLE NOTES PANEL --- */}
+        <div className={`fixed top-24 right-0 h-[70vh] bg-white dark:bg-slate-800 shadow-[0_0_15px_rgba(0,0,0,0.1)] border-l border-y border-slate-200 dark:border-slate-700 transition-transform duration-300 z-50 rounded-l-xl flex flex-col ${isNotesOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: '320px' }}>
+          <div className="flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-tl-xl">
+             <span className="font-bold text-sm flex items-center gap-2 text-blueVelvet dark:text-goldenYellow"><BookOpen size={16}/> Adjustments & Notes</span>
+             <button onClick={() => setIsNotesOpen(false)} className="text-slate-500 hover:text-red-500 transition-colors"><PanelRightClose size={18}/></button>
+          </div>
+          <textarea
+             value={notesText}
+             onChange={e => setNotesText(e.target.value)}
+             className="w-full flex-1 p-4 resize-none bg-transparent focus:outline-none text-sm dark:text-slate-200"
+             placeholder="Jot down assumptions, goal changes, or target figures here. This data saves with your backup file."
+          ></textarea>
+        </div>
+
+        {/* Toggle Button for Notes */}
+        {!isNotesOpen && (
+           <button onClick={() => setIsNotesOpen(true)} className="fixed top-1/3 right-0 bg-tangerine hover:bg-orange-600 text-white p-2 rounded-l-md shadow-lg z-40 transition-colors flex items-center gap-2 pr-4">
+             <BookOpen size={20} /> <span className="text-xs font-bold whitespace-nowrap">Notes</span>
+           </button>
+        )}
+        {/* ------------------------------------------ */}
         
         {/* Top Header */}
         <header className={`bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10`}>
@@ -851,7 +1401,7 @@ export default function XeiaFinance() {
           </div>
         </header>
 
-        <main className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8`}>
+        <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8`}>
           
           {/* Tab Navigation */}
           <div className="flex flex-wrap gap-1 mb-6 border-b border-slate-200 dark:border-slate-700 pb-px">
@@ -863,10 +1413,13 @@ export default function XeiaFinance() {
               { id: 'ratios', icon: LineChart, label: 'Analysis & Ratios' },
               { id: 'tax', icon: Receipt, label: 'BIR Taxes' },
               { id: 'payroll', icon: Users, label: 'Payroll' },
+              { id: 'costing', icon: Package, label: 'Prod. Costing' },
+              { id: 'forecast', icon: TrendingUp, label: 'Sales Forecast' },
+              { id: 'depreciation', icon: Archive, label: 'Depreciation' },
             ].map((tab) => (
               <button
                 key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg font-medium transition-colors text-sm ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg font-medium transition-colors text-sm whitespace-nowrap ${
                   activeTab === tab.id 
                     ? `bg-white dark:bg-slate-800 text-tangerine border-t-[3px] border-t-tangerine border-l border-r border-slate-200 dark:border-slate-700 shadow-[0_4px_0_0_white] dark:shadow-[0_4px_0_0_#1e293b] -mb-[1px]` 
                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -881,7 +1434,7 @@ export default function XeiaFinance() {
           <div className={`bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 p-8 rounded-b-lg rounded-tr-lg min-h-[800px]`}>
             
             {/* General Document Header */}
-            {(activeTab !== 'tax' && activeTab !== 'payroll') && (
+            {(activeTab !== 'tax' && activeTab !== 'payroll' && activeTab !== 'costing' && activeTab !== 'forecast' && activeTab !== 'depreciation') && (
               <div className="mb-6">
                 <input type="text" value={companyName ?? ''} onChange={(e) => setCompanyName(e.target.value)} className={`text-2xl font-bold uppercase tracking-wide bg-transparent border-none focus:outline-none w-full ${isDarkMode ? `text-goldenYellow` : `text-blueVelvet`}`} placeholder="COMPANY NAME" />
                 <input type="text" value={dbaName ?? ''} onChange={(e) => setDbaName(e.target.value)} className="text-sm tracking-wide bg-transparent border-none focus:outline-none w-full text-slate-600 dark:text-slate-400" placeholder="Doing business under..." />
@@ -954,7 +1507,7 @@ export default function XeiaFinance() {
             )}
 
             {/* Single Column Shared Header */}
-            {(activeTab !== 'balance' && activeTab !== 'tax' && activeTab !== 'payroll' && activeTab !== 'ratios') && (
+            {(activeTab !== 'balance' && activeTab !== 'tax' && activeTab !== 'payroll' && activeTab !== 'ratios' && activeTab !== 'costing' && activeTab !== 'forecast' && activeTab !== 'depreciation') && (
               <div className={`flex justify-end border-b-[1.5px] border-slate-800 dark:border-slate-300 pb-1 gap-4 mb-4`}>
                  <input type="text" value={year1 ?? ''} onChange={e => setYear1(e.target.value)} className="w-28 text-right font-bold bg-transparent border-none focus:outline-none text-sm" />
                  {isTwoYear && <input type="text" value={year2 ?? ''} onChange={e => setYear2(e.target.value)} className="w-28 text-right font-bold bg-transparent border-none focus:outline-none text-sm" />}
@@ -1150,6 +1703,31 @@ export default function XeiaFinance() {
                     </table>
                   </div>
                 </div>
+
+                {/* --- NEW RATIOS CHART --- */}
+                <div className="mt-8">
+                  <SectionHeader title="Financial Overview Chart" />
+                  <div className="h-80 w-full bg-slate-50 dark:bg-slate-700/30 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={[
+                        { name: 'Revenue', [year1]: rev1, [year2]: isTwoYear ? rev2 : 0 },
+                        { name: 'Gross Profit', [year1]: gp1, [year2]: isTwoYear ? gp2 : 0 },
+                        { name: 'Net Income', [year1]: ni1, [year2]: isTwoYear ? ni2 : 0 },
+                        { name: 'Total Assets', [year1]: ta1, [year2]: isTwoYear ? ta2 : 0 },
+                        { name: 'Total Equity', [year1]: endEq1, [year2]: isTwoYear ? endEq2 : 0 },
+                      ]} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#334155' : '#e2e8f0'} />
+                        <XAxis dataKey="name" stroke={isDarkMode ? '#94a3b8' : '#64748b'} />
+                        <YAxis stroke={isDarkMode ? '#94a3b8' : '#64748b'} tickFormatter={(value) => `${currencySymbolStr}${value >= 1000000 ? (value/1000000).toFixed(1)+'M' : value >= 1000 ? (value/1000).toFixed(1)+'k' : value}`} />
+                        <RechartsTooltip formatter={(value) => `${currencySymbolStr}${value.toLocaleString('en-US', {minimumFractionDigits: 2})}`} contentStyle={{ backgroundColor: isDarkMode ? '#1e293b' : '#fff', color: isDarkMode ? '#f8fafc' : '#0f172a', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                        <Legend />
+                        <Bar dataKey={year1} fill={COLORS.blueJeans} radius={[4, 4, 0, 0]} />
+                        {isTwoYear && <Bar dataKey={year2} fill={COLORS.goldenYellow} radius={[4, 4, 0, 0]} />}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
               </div>
             )}
 
@@ -1650,6 +2228,505 @@ export default function XeiaFinance() {
                   </div>
                 </div>
 
+              </div>
+            )}
+
+
+            {/* --- NEW TABS (COSTING, FORECAST, DEPRECIATION) --- */}
+
+            {/* 8. PRODUCT COSTING TAB */}
+            {activeTab === 'costing' && (
+              <div className="animate-in fade-in">
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 dark:border-slate-700 pb-6">
+                    <div>
+                      <h2 className={`text-2xl font-bold text-blueVelvet dark:text-goldenYellow`}>Production Cost Template</h2>
+                      <p className="text-sm text-slate-500">Efficiently manage and analyze production costs per product.</p>
+                    </div>
+                    <button onClick={postProductionCostToCOGS} className="bg-tangerine hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-colors">
+                      <ArrowRightCircle size={18}/> Post to SPL (Cost of Sales)
+                    </button>
+                 </div>
+
+                 {/* Top Summary Blocks */}
+                 <div className="grid grid-cols-2 md:grid-cols-4 border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden mb-8 shadow-sm">
+                    <div className="bg-emerald-100/50 dark:bg-emerald-900/20 p-4 border-b md:border-b-0 md:border-r border-slate-300 dark:border-slate-600 text-center">
+                       <div className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 mb-1 uppercase tracking-wider">Material Cost</div>
+                       <div className="text-xl font-bold font-mono text-emerald-900 dark:text-emerald-300">{currencySymbolStr}{totalCostMaterials.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
+                    </div>
+                    <div className="bg-blue-100/50 dark:bg-blue-900/20 p-4 border-b md:border-b-0 md:border-r border-slate-300 dark:border-slate-600 text-center">
+                       <div className="text-[11px] font-bold text-blue-800 dark:text-blue-400 mb-1 uppercase tracking-wider">Labor Cost</div>
+                       <div className="text-xl font-bold font-mono text-blue-900 dark:text-blue-300">{currencySymbolStr}{totalCostLabor.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
+                    </div>
+                    <div className="bg-amber-100/50 dark:bg-amber-900/20 p-4 border-r border-slate-300 dark:border-slate-600 text-center">
+                       <div className="text-[11px] font-bold text-amber-800 dark:text-amber-400 mb-1 uppercase tracking-wider">Overhead Cost</div>
+                       <div className="text-xl font-bold font-mono text-amber-900 dark:text-amber-300">{currencySymbolStr}{totalCostOverhead.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
+                    </div>
+                    <div className="bg-slate-200 dark:bg-slate-700 p-4 text-center">
+                       <div className="text-[11px] font-bold text-slate-800 dark:text-slate-300 mb-1 uppercase tracking-wider">Total Production Cost</div>
+                       <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">{currencySymbolStr}{grandTotalProductionCost.toLocaleString('en-US', {minimumFractionDigits:2})}</div>
+                    </div>
+                 </div>
+
+                 {/* --- NEW COSTING PIE CHART --- */}
+                 <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6 items-center bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div>
+                      <h3 className="font-bold text-sm mb-2 uppercase tracking-wide text-center text-slate-700 dark:text-slate-300">Cost Breakdown</h3>
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie
+                              data={[
+                                { name: 'Material Cost', value: totalCostMaterials },
+                                { name: 'Labor Cost', value: totalCostLabor },
+                                { name: 'Overhead Cost', value: totalCostOverhead }
+                              ]}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              <Cell fill="#10b981" />
+                              <Cell fill="#3b82f6" />
+                              <Cell fill="#f59e0b" />
+                            </Pie>
+                            <RechartsTooltip formatter={(value) => `${currencySymbolStr}${value.toLocaleString('en-US', {minimumFractionDigits: 2})}`} />
+                            <Legend verticalAlign="bottom" height={36}/>
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-4 justify-center">
+                       <div className="p-3 border-l-4 border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10 rounded">
+                         <span className="text-xs text-slate-500 font-bold">MATERIAL %</span>
+                         <div className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{grandTotalProductionCost > 0 ? ((totalCostMaterials / grandTotalProductionCost) * 100).toFixed(1) : 0}%</div>
+                       </div>
+                       <div className="p-3 border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/10 rounded">
+                         <span className="text-xs text-slate-500 font-bold">LABOR %</span>
+                         <div className="text-lg font-bold text-blue-700 dark:text-blue-400">{grandTotalProductionCost > 0 ? ((totalCostLabor / grandTotalProductionCost) * 100).toFixed(1) : 0}%</div>
+                       </div>
+                       <div className="p-3 border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/10 rounded">
+                         <span className="text-xs text-slate-500 font-bold">OVERHEAD %</span>
+                         <div className="text-lg font-bold text-amber-700 dark:text-amber-400">{grandTotalProductionCost > 0 ? ((totalCostOverhead / grandTotalProductionCost) * 100).toFixed(1) : 0}%</div>
+                       </div>
+                    </div>
+                 </div>
+
+                 {/* Product Information */}
+                 <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg border border-slate-200 dark:border-slate-700 mb-8">
+                    <h3 className="font-bold text-sm mb-4 border-b border-slate-200 dark:border-slate-600 pb-2 uppercase tracking-wide">Product Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <label className="flex items-center text-sm font-medium gap-4">
+                         <span className="w-32">Product ID:</span> 
+                         <input type="text" value={costingData.productId} onChange={e => setCostingData({...costingData, productId: e.target.value})} className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:outline-blueJeans" />
+                       </label>
+                       <label className="flex items-center text-sm font-medium gap-4">
+                         <span className="w-32">Product Name:</span> 
+                         <input type="text" value={costingData.productName} onChange={e => setCostingData({...costingData, productName: e.target.value})} className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:outline-blueJeans" />
+                       </label>
+                       <label className="flex items-start text-sm font-medium gap-4 md:col-span-2">
+                         <span className="w-32 mt-1">Description:</span> 
+                         <textarea value={costingData.productDescription} onChange={e => setCostingData({...costingData, productDescription: e.target.value})} className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-1.5 focus:outline-blueJeans resize-none h-16" />
+                       </label>
+                    </div>
+                 </div>
+
+                 {/* Materials Table */}
+                 <div className="mb-8">
+                    <div className="flex items-center justify-between bg-emerald-700 text-white px-4 py-2 rounded-t-md">
+                       <h3 className="font-bold text-sm uppercase tracking-wider">Materials</h3>
+                    </div>
+                    <div className="overflow-x-auto border-x border-b border-slate-300 dark:border-slate-700 rounded-b-md">
+                       <table className="w-full text-sm text-left whitespace-nowrap">
+                          <thead className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-900 dark:text-emerald-300 border-b border-slate-300 dark:border-slate-700">
+                             <tr>
+                                <th className="px-4 py-2 font-bold">Item Description</th>
+                                <th className="px-4 py-2 font-bold w-32">Unit</th>
+                                <th className="px-4 py-2 font-bold w-24 text-right">Quantity</th>
+                                <th className="px-4 py-2 font-bold w-32 text-right">Unit Cost</th>
+                                <th className="px-4 py-2 font-bold w-32 text-right">Total Cost</th>
+                                <th className="w-10"></th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                             {costingData.materials.map(mat => (
+                               <tr key={mat.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                 <td className="px-4 py-2"><input type="text" value={mat.desc} onChange={e => setCostingData({...costingData, materials: costingData.materials.map(m => m.id===mat.id ? {...m, desc: e.target.value} : m)})} className="w-full bg-transparent border-b border-transparent focus:border-emerald-500 focus:outline-none"/></td>
+                                 <td className="px-4 py-2"><input type="text" value={mat.unit} onChange={e => setCostingData({...costingData, materials: costingData.materials.map(m => m.id===mat.id ? {...m, unit: e.target.value} : m)})} className="w-full bg-transparent border-b border-transparent focus:border-emerald-500 focus:outline-none"/></td>
+                                 <td className="px-4 py-2 text-right"><input type="number" value={mat.qty} onChange={e => setCostingData({...costingData, materials: costingData.materials.map(m => m.id===mat.id ? {...m, qty: Number(e.target.value)} : m)})} className="w-full text-right bg-transparent border-b border-transparent focus:border-emerald-500 focus:outline-none font-mono"/></td>
+                                 <td className="px-4 py-2 text-right"><CurrencyInput value={mat.unitCost} onChange={v => setCostingData({...costingData, materials: costingData.materials.map(m => m.id===mat.id ? {...m, unitCost: v} : m)})} currencySymbol={currencySymbolStr} showSymbol={true}/></td>
+                                 <td className="px-4 py-2 text-right font-bold text-slate-800 dark:text-slate-200 font-mono">{(mat.qty * mat.unitCost).toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                                 <td className="px-2 text-center"><button onClick={() => setCostingData({...costingData, materials: costingData.materials.filter(m => m.id !== mat.id)})} className="text-slate-400 hover:text-red-500"><Trash2 size={14}/></button></td>
+                               </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </div>
+                    <button onClick={() => setCostingData({...costingData, materials: [...costingData.materials, { id: Date.now(), desc: 'New Material', unit: 'Piece', qty: 0, unitCost: 0 }]})} className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 hover:opacity-80">
+                      <Plus size={14}/> Add Material
+                    </button>
+                 </div>
+
+                 {/* Labor Table */}
+                 <div className="mb-8">
+                    <div className="flex items-center justify-between bg-blue-700 text-white px-4 py-2 rounded-t-md">
+                       <h3 className="font-bold text-sm uppercase tracking-wider">Labor</h3>
+                    </div>
+                    <div className="overflow-x-auto border-x border-b border-slate-300 dark:border-slate-700 rounded-b-md">
+                       <table className="w-full text-sm text-left whitespace-nowrap">
+                          <thead className="bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-300 border-b border-slate-300 dark:border-slate-700">
+                             <tr>
+                                <th className="px-4 py-2 font-bold">Item Description</th>
+                                <th className="px-4 py-2 font-bold w-24 text-right">No. of Hours</th>
+                                <th className="px-4 py-2 font-bold w-32 text-right">Hourly Rate</th>
+                                <th className="px-4 py-2 font-bold w-32 text-right">Total Cost</th>
+                                <th className="w-10"></th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                             {costingData.labor.map(lab => (
+                               <tr key={lab.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                 <td className="px-4 py-2"><input type="text" value={lab.desc} onChange={e => setCostingData({...costingData, labor: costingData.labor.map(l => l.id===lab.id ? {...l, desc: e.target.value} : l)})} className="w-full bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none"/></td>
+                                 <td className="px-4 py-2 text-right"><input type="number" value={lab.hours} onChange={e => setCostingData({...costingData, labor: costingData.labor.map(l => l.id===lab.id ? {...l, hours: Number(e.target.value)} : l)})} className="w-full text-right bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none font-mono"/></td>
+                                 <td className="px-4 py-2 text-right"><CurrencyInput value={lab.hourlyRate} onChange={v => setCostingData({...costingData, labor: costingData.labor.map(l => l.id===lab.id ? {...l, hourlyRate: v} : l)})} currencySymbol={currencySymbolStr} showSymbol={true}/></td>
+                                 <td className="px-4 py-2 text-right font-bold text-slate-800 dark:text-slate-200 font-mono">{(lab.hours * lab.hourlyRate).toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                                 <td className="px-2 text-center"><button onClick={() => setCostingData({...costingData, labor: costingData.labor.filter(l => l.id !== lab.id)})} className="text-slate-400 hover:text-red-500"><Trash2 size={14}/></button></td>
+                               </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </div>
+                    <button onClick={() => setCostingData({...costingData, labor: [...costingData.labor, { id: Date.now(), desc: 'New Labor', hours: 0, hourlyRate: 0 }]})} className="mt-2 text-xs text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1 hover:opacity-80">
+                      <Plus size={14}/> Add Labor
+                    </button>
+                 </div>
+
+                 {/* Overhead Table */}
+                 <div className="mb-4">
+                    <div className="flex items-center justify-between bg-amber-600 text-white px-4 py-2 rounded-t-md">
+                       <h3 className="font-bold text-sm uppercase tracking-wider">Overhead</h3>
+                    </div>
+                    <div className="overflow-x-auto border-x border-b border-slate-300 dark:border-slate-700 rounded-b-md">
+                       <table className="w-full text-sm text-left whitespace-nowrap">
+                          <thead className="bg-amber-50 dark:bg-amber-900/30 text-amber-900 dark:text-amber-300 border-b border-slate-300 dark:border-slate-700">
+                             <tr>
+                                <th className="px-4 py-2 font-bold">Item Description</th>
+                                <th className="px-4 py-2 font-bold w-48 text-right">Total Cost</th>
+                                <th className="w-10"></th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                             {costingData.overhead.map(oh => (
+                               <tr key={oh.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                 <td className="px-4 py-2"><input type="text" value={oh.desc} onChange={e => setCostingData({...costingData, overhead: costingData.overhead.map(o => o.id===oh.id ? {...o, desc: e.target.value} : o)})} className="w-full bg-transparent border-b border-transparent focus:border-amber-500 focus:outline-none"/></td>
+                                 <td className="px-4 py-2 text-right"><CurrencyInput value={oh.amount} onChange={v => setCostingData({...costingData, overhead: costingData.overhead.map(o => o.id===oh.id ? {...o, amount: v} : o)})} currencySymbol={currencySymbolStr} showSymbol={true}/></td>
+                                 <td className="px-2 text-center"><button onClick={() => setCostingData({...costingData, overhead: costingData.overhead.filter(o => o.id !== oh.id)})} className="text-slate-400 hover:text-red-500"><Trash2 size={14}/></button></td>
+                               </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </div>
+                    <button onClick={() => setCostingData({...costingData, overhead: [...costingData.overhead, { id: Date.now(), desc: 'New Overhead', amount: 0 }]})} className="mt-2 text-xs text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1 hover:opacity-80">
+                      <Plus size={14}/> Add Overhead
+                    </button>
+                 </div>
+
+              </div>
+            )}
+
+
+            {/* 9. SALES FORECAST TAB */}
+            {activeTab === 'forecast' && (
+              <div className="animate-in fade-in">
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 dark:border-slate-700 pb-6">
+                    <div>
+                      <h2 className={`text-2xl font-bold text-blueVelvet dark:text-goldenYellow`}>Sales Forecast Template</h2>
+                      <p className="text-sm text-slate-500">Project future sales across multiple periods and post directly to Revenues.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button onClick={addForecastPeriod} className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-blueVelvet dark:text-slate-200 px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-colors border border-slate-300 dark:border-slate-600">
+                        <Plus size={16}/> Add Period
+                      </button>
+                      <button onClick={postForecastTotalToRevenue} className="bg-tangerine hover:opacity-90 text-white px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-colors">
+                        <ArrowRightCircle size={18}/> Post Total to SPL Revenue
+                      </button>
+                    </div>
+                 </div>
+
+                 {/* --- NEW FORECAST CHART --- */}
+                 <div className="mb-8">
+                   <div className="h-64 w-full bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                     <ResponsiveContainer width="100%" height="100%">
+                       <RechartsLineChart data={
+                          forecastPeriods.map(p => {
+                            let total = 0;
+                            forecastItems.forEach(item => {
+                               total += (item.periods[p]?.price || 0) * (item.periods[p]?.qty || 0);
+                            });
+                            return { name: p, Sales: total };
+                          })
+                       } margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+                         <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#334155' : '#e2e8f0'} />
+                         <XAxis dataKey="name" stroke={isDarkMode ? '#94a3b8' : '#64748b'} />
+                         <YAxis stroke={isDarkMode ? '#94a3b8' : '#64748b'} tickFormatter={(value) => `${currencySymbolStr}${value >= 1000 ? (value/1000).toFixed(1)+'k' : value}`} />
+                         <RechartsTooltip formatter={(value) => `${currencySymbolStr}${value.toLocaleString('en-US', {minimumFractionDigits: 2})}`} contentStyle={{ backgroundColor: isDarkMode ? '#1e293b' : '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                         <Legend />
+                         <Line type="monotone" name="Total Projected Sales" dataKey="Sales" stroke={COLORS.tangerine} strokeWidth={3} activeDot={{ r: 8 }} />
+                       </RechartsLineChart>
+                     </ResponsiveContainer>
+                   </div>
+                 </div>
+
+                 <div className="overflow-x-auto border border-slate-300 dark:border-slate-700 rounded-lg shadow-sm">
+                    <table className="min-w-full text-sm text-left whitespace-nowrap bg-white dark:bg-slate-800">
+                       <thead>
+                          <tr>
+                            <th className="px-4 py-3 bg-blueVelvet text-white font-bold sticky left-0 z-10 w-48 border-r border-slate-600">PRODUCT NAME</th>
+                            {forecastPeriods.map((p, index) => (
+                              <th key={index} className={`px-4 py-3 font-bold text-center border-r border-slate-300 dark:border-slate-700 ${index % 2 === 0 ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white'}`}>
+                                <div className="flex items-center justify-center gap-2">
+                                  <input 
+                                    type="text" value={p} 
+                                    onChange={e => {
+                                      const newPeriods = [...forecastPeriods];
+                                      const oldP = newPeriods[index];
+                                      newPeriods[index] = e.target.value;
+                                      
+                                      // update keys in items
+                                      const newItems = forecastItems.map(item => {
+                                        const newItem = {...item, periods: {...item.periods}};
+                                        newItem.periods[e.target.value] = newItem.periods[oldP];
+                                        delete newItem.periods[oldP];
+                                        return newItem;
+                                      });
+                                      setForecastPeriods(newPeriods);
+                                      setForecastItems(newItems);
+                                    }}
+                                    className="bg-transparent text-center focus:outline-none w-24 font-bold"
+                                  />
+                                  <button onClick={() => {
+                                     setForecastPeriods(forecastPeriods.filter((_, i) => i !== index));
+                                     setForecastItems(forecastItems.map(item => {
+                                        const newItem = {...item, periods: {...item.periods}};
+                                        delete newItem.periods[p];
+                                        return newItem;
+                                     }));
+                                  }} className="text-white/50 hover:text-red-200"><Trash2 size={12}/></button>
+                                </div>
+                              </th>
+                            ))}
+                            <th className="px-4 py-3 bg-slate-200 dark:bg-slate-700 font-bold text-slate-800 dark:text-slate-200 border-l border-slate-300 text-right">TOTAL</th>
+                            <th className="px-2 py-3 bg-slate-200 dark:bg-slate-700"></th>
+                          </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-400 border-t-[3px] border-slate-400">
+                          {forecastItems.map(item => {
+                             // Item Total
+                             let itemTotal = 0;
+                             forecastPeriods.forEach(p => {
+                               const { price = 0, qty = 0 } = item.periods[p] || {};
+                               itemTotal += (price * qty);
+                             });
+
+                             return (
+                               <React.Fragment key={item.id}>
+                                 {/* First row for item (Price) */}
+                                 <tr>
+                                   <td rowSpan="3" className="px-4 py-2 sticky left-0 z-10 bg-white dark:bg-slate-800 border-r-[3px] border-slate-400 align-top pt-4 font-bold">
+                                     <input 
+                                       type="text" value={item.name} 
+                                       onChange={e => setForecastItems(forecastItems.map(i => i.id === item.id ? {...i, name: e.target.value} : i))}
+                                       className="w-full bg-transparent focus:outline-none focus:border-b focus:border-blueJeans"
+                                     />
+                                   </td>
+                                   {forecastPeriods.map((p, index) => (
+                                     <td key={`price-${p}`} className={`px-4 py-2 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50`}>
+                                       <div className="flex justify-between items-center text-xs">
+                                          <span className="text-slate-500">PRICE</span>
+                                          <CurrencyInput 
+                                             value={item.periods[p]?.price || 0} 
+                                             onChange={v => setForecastItems(forecastItems.map(i => i.id === item.id ? {...i, periods: {...i.periods, [p]: {...i.periods[p], price: v}}} : i))} 
+                                             currencySymbol={currencySymbolStr} showSymbol={true}
+                                          />
+                                       </div>
+                                     </td>
+                                   ))}
+                                   <td rowSpan="3" className="px-4 py-2 align-middle text-right bg-slate-100 dark:bg-slate-700/50 border-l-[3px] border-slate-400 font-bold text-lg font-mono">
+                                     {currencySymbolStr}{itemTotal.toLocaleString('en-US', {minimumFractionDigits:2})}
+                                   </td>
+                                   <td rowSpan="3" className="px-2 py-2 align-middle bg-slate-100 dark:bg-slate-700/50">
+                                      <button onClick={() => setForecastItems(forecastItems.filter(i => i.id !== item.id))} className="text-slate-400 hover:text-red-500"><Trash2 size={16}/></button>
+                                   </td>
+                                 </tr>
+                                 {/* Second row (Qty) */}
+                                 <tr>
+                                   {forecastPeriods.map((p, index) => (
+                                     <td key={`qty-${p}`} className={`px-4 py-2 border-r border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-600`}>
+                                       <div className="flex justify-between items-center text-xs">
+                                          <span className="text-slate-500">UNITS</span>
+                                          <input 
+                                            type="number" value={item.periods[p]?.qty || 0} 
+                                            onChange={e => setForecastItems(forecastItems.map(i => i.id === item.id ? {...i, periods: {...i.periods, [p]: {...i.periods[p], qty: Number(e.target.value)}}} : i))}
+                                            className="w-20 text-right bg-transparent focus:outline-none border-b border-transparent focus:border-blueJeans font-mono"
+                                          />
+                                       </div>
+                                     </td>
+                                   ))}
+                                 </tr>
+                                 {/* Third row (Total) */}
+                                 <tr>
+                                   {forecastPeriods.map((p, index) => {
+                                     const pTotal = (item.periods[p]?.price || 0) * (item.periods[p]?.qty || 0);
+                                     return (
+                                       <td key={`total-${p}`} className={`px-4 py-2 border-r border-slate-200 dark:border-slate-700 border-t border-slate-300 dark:border-slate-600 ${index % 2 === 0 ? 'bg-amber-50 dark:bg-amber-900/10' : 'bg-emerald-50 dark:bg-emerald-900/10'}`}>
+                                         <div className="flex justify-between items-center text-sm font-bold">
+                                            <span className="text-slate-600 dark:text-slate-400 text-xs">TOTAL</span>
+                                            <span className="font-mono text-slate-800 dark:text-slate-200">{currencySymbolStr}{pTotal.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+                                         </div>
+                                       </td>
+                                     )
+                                   })}
+                                 </tr>
+                               </React.Fragment>
+                             )
+                          })}
+                          
+                          {/* Grand Totals Bottom Row */}
+                          <tr className="bg-slate-200 dark:bg-slate-700 border-t-[3px] border-slate-400 font-bold">
+                             <td className="px-4 py-3 sticky left-0 z-10 bg-slate-300 dark:bg-slate-600 border-r-[3px] border-slate-400">GRAND TOTAL SALES</td>
+                             {forecastPeriods.map((p, index) => {
+                                let colTotal = 0;
+                                forecastItems.forEach(item => {
+                                  colTotal += (item.periods[p]?.price || 0) * (item.periods[p]?.qty || 0);
+                                });
+                                return (
+                                  <td key={`gt-${p}`} className="px-4 py-3 text-right font-mono text-slate-800 dark:text-slate-100 border-r border-slate-300 dark:border-slate-600">
+                                    {currencySymbolStr}{colTotal.toLocaleString('en-US', {minimumFractionDigits:2})}
+                                  </td>
+                                )
+                             })}
+                             <td className="px-4 py-3 text-right font-mono text-lg text-blueVelvet dark:text-goldenYellow border-l-[3px] border-slate-400">
+                                {(() => {
+                                   let gt = 0;
+                                   forecastItems.forEach(item => {
+                                      forecastPeriods.forEach(p => gt += (item.periods[p]?.price || 0) * (item.periods[p]?.qty || 0));
+                                   });
+                                   return `${currencySymbolStr}${gt.toLocaleString('en-US', {minimumFractionDigits:2})}`;
+                                })()}
+                             </td>
+                             <td></td>
+                          </tr>
+
+                       </tbody>
+                    </table>
+                 </div>
+
+                 <button onClick={() => {
+                   const newId = Date.now();
+                   const newItem = { id: newId, name: `NEW ITEM`, periods: {} };
+                   forecastPeriods.forEach(p => newItem.periods[p] = { price: 0, qty: 0 });
+                   setForecastItems([...forecastItems, newItem]);
+                 }} className="mt-4 bg-slate-100 dark:bg-slate-700 text-blueVelvet dark:text-slate-200 hover:bg-slate-200 px-4 py-2 rounded-md font-bold text-sm flex items-center gap-2 border border-slate-300 transition-colors">
+                   <Plus size={16}/> Add Product Row
+                 </button>
+              </div>
+            )}
+
+
+            {/* 10. DEPRECIATION CALCULATOR TAB */}
+            {activeTab === 'depreciation' && (
+              <div className="animate-in fade-in">
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-200 dark:border-slate-700 pb-6">
+                    <div>
+                      <h2 className={`text-2xl font-bold text-blueVelvet dark:text-goldenYellow`}>Depreciation Calculator</h2>
+                      <p className="text-sm text-slate-500">Calculate asset depreciation and post schedules to expenses and assets.</p>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Input Form */}
+                    <div className="lg:col-span-1 bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                       <h3 className="font-bold text-lg mb-2 text-blueJeans dark:text-goldenYellow border-b border-slate-200 dark:border-slate-600 pb-2">Asset Details</h3>
+                       
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Asset Name</label>
+                         <input type="text" value={deprState.assetName} onChange={e => setDeprState({...deprState, assetName: e.target.value})} className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm focus:outline-blue-500" />
+                       </div>
+
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Acquisition Cost</label>
+                         <div className="flex bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2">
+                           <CurrencyInput value={deprState.cost} onChange={v => setDeprState({...deprState, cost: v})} currencySymbol={currencySymbolStr} />
+                         </div>
+                       </div>
+
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Salvage Value (Residual)</label>
+                         <div className="flex bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2">
+                           <CurrencyInput value={deprState.salvage} onChange={v => setDeprState({...deprState, salvage: v})} currencySymbol={currencySymbolStr} />
+                         </div>
+                       </div>
+
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Useful Life (Years)</label>
+                         <input type="number" value={deprState.life} onChange={e => setDeprState({...deprState, life: Number(e.target.value)})} className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm focus:outline-blue-500 font-mono" />
+                       </div>
+
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Depreciation Method</label>
+                         <select value={deprState.method} onChange={e => setDeprState({...deprState, method: e.target.value})} className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm focus:outline-blue-500">
+                           <option value="Straight Line">Straight Line</option>
+                           <option value="Double Declining">Double Declining Balance</option>
+                         </select>
+                       </div>
+
+                       <button onClick={generateDeprSchedule} className="w-full bg-blueJeans hover:opacity-90 text-white font-bold py-2.5 rounded-md mt-4 transition-colors">
+                         Generate Schedule
+                       </button>
+                    </div>
+
+                    {/* Schedule Table */}
+                    <div className="lg:col-span-2">
+                       {deprSchedule.length === 0 ? (
+                         <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50 dark:bg-slate-800/30 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl py-12">
+                            <Calculator size={48} className="mb-4 opacity-50" />
+                            <p>Enter details and click "Generate Schedule" to view depreciation table.</p>
+                         </div>
+                       ) : (
+                         <div className="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                           <table className="w-full text-sm text-left whitespace-nowrap">
+                              <thead className="bg-blueVelvet text-white">
+                                 <tr>
+                                    <th className="px-4 py-3 font-semibold text-center w-16">Year</th>
+                                    <th className="px-4 py-3 font-semibold text-right">Beg. Book Value</th>
+                                    <th className="px-4 py-3 font-semibold text-right">Depr. Expense</th>
+                                    <th className="px-4 py-3 font-semibold text-right">Accum. Depr.</th>
+                                    <th className="px-4 py-3 font-semibold text-right">End Book Value</th>
+                                    <th className="px-4 py-3 text-center">Action</th>
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                 {deprSchedule.map((row, index) => (
+                                    <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                      <td className="px-4 py-3 text-center font-bold">{row.year}</td>
+                                      <td className="px-4 py-3 text-right font-mono">₱{row.begBV.toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                                      <td className="px-4 py-3 text-right font-mono text-tangerine font-bold">₱{row.exp.toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                                      <td className="px-4 py-3 text-right font-mono text-red-500">₱{row.accDepr.toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                                      <td className="px-4 py-3 text-right font-mono font-bold text-blueJeans dark:text-blue-300">₱{row.endBV.toLocaleString('en-US', {minimumFractionDigits:2})}</td>
+                                      <td className="px-4 py-3 text-center">
+                                        <button onClick={() => postDeprToSPL(index)} className="bg-goldenYellow/20 text-goldStars hover:bg-goldenYellow/40 px-3 py-1 rounded text-xs font-bold transition-colors whitespace-nowrap border border-goldenYellow/30">
+                                          Post to SPL/CF
+                                        </button>
+                                      </td>
+                                    </tr>
+                                 ))}
+                              </tbody>
+                           </table>
+                         </div>
+                       )}
+                    </div>
+                 </div>
               </div>
             )}
 
