@@ -267,6 +267,7 @@ export default function XeiaFinance() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const isApplyingRemote = useRef(false);
   const deviceId = useRef(Math.random().toString(36).substr(2, 9)); // Distinguish same account on diff tabs
+  const [activeField, setActiveField] = useState(null); // Tracks specifically what area/field is being edited
 
   // --- STATE MANAGEMENT ---
   const [companyName, setCompanyName] = useState('XEIA CORPORATION');
@@ -434,6 +435,35 @@ export default function XeiaFinance() {
 
   // --- FIREBASE SYNC & COLLABORATION EFFECTS ---
 
+  // Global Focus Tracker for Presence
+  useEffect(() => {
+    const handleFocusIn = (e) => {
+      const el = e.target;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+         let name = el.placeholder || el.name || el.id;
+         if (!name) {
+            const prev = el.previousSibling;
+            if (prev && prev.nodeType === 3 && prev.textContent.trim()) {
+               name = prev.textContent.trim();
+            } else if (el.closest('.group') && el.closest('.group').querySelector('input[type="text"]')) {
+               const rowNameInput = el.closest('.group').querySelector('input[type="text"]');
+               if (rowNameInput && rowNameInput !== el && rowNameInput.value) {
+                  name = rowNameInput.value;
+               }
+            }
+         }
+         setActiveField(name ? (name.length > 30 ? name.substring(0,30)+'...' : name) : 'a field');
+      }
+    };
+    const handleFocusOut = () => setActiveField(null);
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+       document.removeEventListener('focusin', handleFocusIn);
+       document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+
   // Auth Initialization
   useEffect(() => {
     if (!auth) return;
@@ -460,7 +490,7 @@ export default function XeiaFinance() {
     const myPresenceId = `${user.uid}_${deviceId.current}`;
     const presenceRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence', myPresenceId);
     
-    setDoc(presenceRef, { name: loginName, tab: activeTab, timestamp: Date.now() }).catch(console.error);
+    setDoc(presenceRef, { name: loginName, tab: activeTab, field: activeField, timestamp: Date.now() }).catch(console.error);
 
     const handleUnload = () => deleteDoc(presenceRef);
     window.addEventListener('beforeunload', handleUnload);
@@ -492,7 +522,7 @@ export default function XeiaFinance() {
       unsubChat();
       window.removeEventListener('beforeunload', handleUnload);
     };
-  }, [user, isAuthenticated, activeTab, loginName]);
+  }, [user, isAuthenticated, activeTab, activeField, loginName]);
 
   // Pull State Updates from Firebase
   useEffect(() => {
@@ -1607,9 +1637,29 @@ export default function XeiaFinance() {
             
             <div className="flex items-center gap-3 shrink-0">
               {/* LIVE PRESENCE INDICATOR (HEADER) */}
-              <div className="flex items-center gap-1.5 mr-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 px-3 py-1 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300 shadow-sm">
-                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                 {onlineUsers.length + 1} Online
+              <div className="relative group cursor-pointer">
+                 <div className="flex items-center gap-1.5 mr-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 px-3 py-1 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300 shadow-sm">
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    {onlineUsers.length + 1} Online
+                 </div>
+                 {/* Dropdown Details for Collaborative Presence */}
+                 <div className="absolute top-full mt-2 right-0 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-50 p-3">
+                    <div className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Active Collaborators</div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                       <div className="flex flex-col p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800/30">
+                          <span className="text-xs font-bold text-blueJeans dark:text-goldenYellow">{loginName} (You)</span>
+                          <span className="text-[10px] text-slate-500 font-medium">Tab: <span className="uppercase text-slate-700 dark:text-slate-300">{activeTab}</span></span>
+                          {activeField && <span className="text-[10px] text-slate-500 font-medium text-tangerine truncate">Editing: {activeField}</span>}
+                       </div>
+                       {onlineUsers.map(u => (
+                          <div key={u.id} className="flex flex-col p-2 bg-slate-50 dark:bg-slate-700/30 rounded border border-slate-100 dark:border-slate-600/50">
+                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{u.name}</span>
+                             <span className="text-[10px] text-slate-500 font-medium">Tab: <span className="uppercase text-slate-700 dark:text-slate-300">{u.tab}</span></span>
+                             {u.field && <span className="text-[10px] text-slate-500 font-medium text-tangerine truncate">Editing: {u.field}</span>}
+                          </div>
+                       ))}
+                    </div>
+                 </div>
               </div>
 
               <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Toggle Dark Mode">
@@ -1678,7 +1728,7 @@ export default function XeiaFinance() {
                 {/* LIVE PRESENCE INDICATORS PER TAB */}
                 <div className="flex -space-x-1 ml-1.5">
                    {onlineUsers.filter(u => u.tab === tab.id).map((u, idx) => (
-                      <div key={idx} className="h-5 w-5 rounded-full bg-tangerine text-[9px] font-bold text-white flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm" title={`${u.name} is currently editing this tab`}>
+                      <div key={idx} className="h-5 w-5 rounded-full bg-tangerine text-[9px] font-bold text-white flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm" title={`${u.name} is currently editing ${u.field ? `'${u.field}'` : 'this tab'}`}>
                          {u.name.charAt(0).toUpperCase()}
                       </div>
                    ))}
