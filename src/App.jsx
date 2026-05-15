@@ -238,7 +238,7 @@ const LinkedRow = ({ label, amount1, amount2, isDarkMode, currencySymbolStr, isC
 };
 
 // --- CUSTOM INPUT COMPONENT ---
-const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isDeductible = false, readOnly = false }) => {
+const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isDeductible = false, readOnly = false, className }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [localStr, setLocalStr] = useState('');
 
@@ -301,9 +301,9 @@ const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isD
 
   if (readOnly) {
     return (
-      <div className="flex items-center gap-2 w-28 justify-end">
+      <div className={`flex items-center gap-2 justify-end ${className || 'w-28'}`}>
         <span className={`text-[11px] font-sans ${showSymbol ? 'text-slate-600 dark:text-slate-400' : 'text-transparent'}`}>{currencySymbol}</span>
-        <span className={`text-right font-medium text-[11px] font-sans ${localStr.includes('(') ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-200'}`}>
+        <span className={`text-right font-medium text-[11px] font-sans ${localStr.includes('(') ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-slate-200'} ${className && className.includes('w-full') ? 'w-full' : ''}`}>
           {localStr || '0.00'}
         </span>
       </div>
@@ -311,7 +311,7 @@ const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isD
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className={`flex items-center gap-1 ${className && className.includes('w-full') ? 'w-full' : ''}`}>
       <span className={`text-sm select-none ${showSymbol ? 'text-slate-500 dark:text-slate-400' : 'text-transparent'}`}>{currencySymbol}</span>
       <input
         type="text"
@@ -319,7 +319,7 @@ const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isD
         onChange={handleChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        className={`w-28 text-right bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blueJeans focus:outline-none transition-colors text-sm dark:text-slate-200 ${
+        className={`${className !== undefined ? className : 'w-28 text-right bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blueJeans'} focus:outline-none transition-colors text-sm dark:text-slate-200 ${
           (!isFocused && localStr.includes('(')) ? 'text-red-600 dark:text-red-400' : ''
         }`}
       />
@@ -426,6 +426,8 @@ export default function App() {
   const [activeTaxSubTab, setActiveTaxSubTab] = useState('income');
   const [taxLedger, setTaxLedger] = useState([]);
   const [taxBasisInput, setTaxBasisInput] = useState(0);
+  const [vatSales, setVatSales] = useState(0);
+  const [vatPurchases, setVatPurchases] = useState(0);
 
   const [incomeTaxTable, setIncomeTaxTable] = useState([
     { id: 1, min: 0, max: 250000, baseTax: 0, excessRate: 0 },
@@ -521,6 +523,7 @@ export default function App() {
     ]
   });
   const [costingTargetPeriod, setCostingTargetPeriod] = useState('2024');
+  const [savedProducts, setSavedProducts] = useState([]);
 
   // SALES FORECAST STATE
   const [forecastPeriods, setForecastPeriods] = useState(['Jul-16', 'Aug-16', 'Sep-16']);
@@ -739,6 +742,7 @@ export default function App() {
         if (s.payrollCols) setPayrollCols(s.payrollCols);
         if (s.employees) setEmployees(s.employees);
         if (s.costingData) setCostingData(s.costingData);
+        if (s.savedProducts) setSavedProducts(s.savedProducts);
         if (s.forecastPeriods) setForecastPeriods(s.forecastPeriods);
         if (s.forecastItems) setForecastItems(s.forecastItems);
         if (s.deprState) setDeprState(s.deprState);
@@ -764,7 +768,7 @@ export default function App() {
         state: {
           companyName, dbaName, isConsolidated, isComparisonMode, currency, periods, activePeriod, comparePeriod,
           splData, sceData, bsData, cfData, ratioData, taxLedger, incomeTaxTable, flatTaxRates,
-          payrollConfig, payrollCols, employees, costingData, forecastPeriods, forecastItems, deprState, deprSchedule, notesText
+          payrollConfig, payrollCols, employees, costingData, savedProducts, forecastPeriods, forecastItems, deprState, deprSchedule, notesText
         },
         lastEditor: `${user.uid}_${deviceId.current}`,
         editorName: loginName,
@@ -776,7 +780,7 @@ export default function App() {
   }, [
     companyName, dbaName, isConsolidated, isComparisonMode, currency, periods, activePeriod, comparePeriod,
     splData, sceData, bsData, cfData, ratioData, taxLedger, incomeTaxTable, flatTaxRates,
-    payrollConfig, payrollCols, employees, costingData, forecastPeriods, forecastItems, deprState, deprSchedule, notesText,
+    payrollConfig, payrollCols, employees, costingData, savedProducts, forecastPeriods, forecastItems, deprState, deprSchedule, notesText,
     user, isAuthenticated, loginName
   ]);
 
@@ -833,7 +837,7 @@ export default function App() {
       timestamp: new Date().toISOString(),
       companyName, dbaName, isConsolidated, isComparisonMode, currency, periods, activePeriod, comparePeriod,
       splData, sceData, bsData, cfData, ratioData, taxLedger, incomeTaxTable, flatTaxRates,
-      payrollConfig, payrollCols, employees, costingData, forecastPeriods, forecastItems, deprState, deprSchedule, notesText
+      payrollConfig, payrollCols, employees, costingData, savedProducts, forecastPeriods, forecastItems, deprState, deprSchedule, notesText
     };
     const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -916,6 +920,7 @@ export default function App() {
         if(s.payrollCols) setPayrollCols(s.payrollCols);
         if(s.employees) setEmployees(s.employees);
         if(s.costingData) setCostingData(s.costingData);
+        if(s.savedProducts) setSavedProducts(s.savedProducts);
         if(s.forecastPeriods) setForecastPeriods(s.forecastPeriods);
         if(s.forecastItems) setForecastItems(s.forecastItems);
         if(s.deprState) setDeprState(s.deprState);
@@ -1108,6 +1113,35 @@ export default function App() {
     alert(`Production Cost successfully posted to Cost of Sales for period: ${costingTargetPeriod}`);
   };
 
+  const handleSaveProduct = () => {
+    if (!costingData.productId.trim()) return alert("Please enter a valid Product ID.");
+    setSavedProducts(prev => {
+      const exists = prev.find(p => p.productId === costingData.productId);
+      if (exists) {
+        return prev.map(p => p.productId === costingData.productId ? costingData : p);
+      } else {
+        return [...prev, costingData];
+      }
+    });
+    alert(`Product "${costingData.productName}" saved successfully!`);
+  };
+
+  const handleLoadProduct = (productId) => {
+    const product = savedProducts.find(p => p.productId === productId);
+    if (product) setCostingData(product);
+  };
+
+  const handleNewProduct = () => {
+    setCostingData({
+      productId: `PROD-${Date.now().toString().slice(-5)}`,
+      productName: 'New Product',
+      productDescription: '',
+      materials: [],
+      labor: [],
+      overhead: []
+    });
+  };
+
   // Forecast Calcs
   const addForecastPeriod = () => {
     let finalPeriod = `Period ${forecastPeriods.length + 1}`;
@@ -1230,6 +1264,30 @@ export default function App() {
     let computedTax = 0; 
     let taxName = ''; 
     let rateStr = '';
+
+    if (activeTaxSubTab === 'vat') {
+      const flatRatesArr = flatTaxRates['vat'] || [];
+      const selectedObj = flatRatesArr.find(t => t.id === selectedFlatTax) || flatRatesArr[0];
+      const outputTax = vatSales * ((selectedObj.rate || 0) / 100);
+      const inputTax = vatPurchases * 0.12; // Standard 12% input tax
+      computedTax = outputTax - inputTax;
+
+      if (vatSales > 0 || vatPurchases > 0) {
+        setTaxLedger([
+          ...taxLedger, 
+          { 
+            id: Date.now(), 
+            name: `Net VAT Payable (${selectedObj.name})`, 
+            rateStr: `${selectedObj.rate}% Output, 12% Input`, 
+            basis: vatSales, 
+            computed: computedTax 
+          }
+        ]);
+        setVatSales(0);
+        setVatPurchases(0);
+      }
+      return;
+    }
     
     if (activeTaxSubTab === 'income' && !selectedFlatTax) {
       taxName = 'Individual Income Tax (Table)';
@@ -2509,7 +2567,7 @@ export default function App() {
                                 <td className="py-2">{row.n}</td>
                                 <td className={`py-2 text-right ${amtChange < 0 ? 'text-red-600' : ''}`}>
                                   {Number(amtChange).toLocaleString('en-US', {minimumFractionDigits: 2})}
-                                </td>
+                                 </td>
                                 <td className={`py-2 text-right font-bold ${pctChange < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                                   {pctChange > 0 ? '+' : ''}{pctChange.toFixed(1)}%
                                 </td>
@@ -2670,20 +2728,36 @@ export default function App() {
                                     </td>
                                     <td className="px-3 py-1">
                                       {row.max === Infinity ? (
-                                        <span className="text-slate-500 italic px-2">Infinity</span>
+                                        <span className="text-slate-500 italic px-2 block w-full py-1">Infinity</span>
                                       ) : (
-                                        <input 
-                                          type="number" 
-                                          value={row.max ?? ''} 
-                                          onChange={(e) => {
-                                            const newTable = [...incomeTaxTable];
-                                            newTable[idx].max = Number(e.target.value);
-                                            if (newTable[idx+1]) newTable[idx+1].min = Number(e.target.value);
-                                            setIncomeTaxTable(newTable);
-                                          }} 
-                                          className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 focus:outline-blue-500 font-mono"
-                                        />
+                                        <div className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 focus-within:ring-1 focus-within:ring-blue-500">
+                                          <CurrencyInput 
+                                            value={row.max ?? 0} 
+                                            onChange={(val) => {
+                                              const newTable = [...incomeTaxTable];
+                                              newTable[idx].max = val;
+                                              if (newTable[idx+1]) newTable[idx+1].min = val;
+                                              setIncomeTaxTable(newTable);
+                                            }} 
+                                            showSymbol={false}
+                                            className="w-full font-mono text-right outline-none bg-transparent"
+                                          />
+                                        </div>
                                       )}
+                                    </td>
+                                    <td className="px-3 py-1">
+                                      <div className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 focus-within:ring-1 focus-within:ring-blue-500">
+                                        <CurrencyInput 
+                                          value={row.baseTax ?? 0} 
+                                          onChange={(val) => {
+                                              const newTable = [...incomeTaxTable];
+                                              newTable[idx].baseTax = val;
+                                              setIncomeTaxTable(newTable);
+                                          }} 
+                                          showSymbol={false}
+                                          className="w-full font-mono text-right outline-none bg-transparent"
+                                        />
+                                      </div>
                                     </td>
                                     <td className="px-3 py-1">
                                       <input 
@@ -2772,18 +2846,59 @@ export default function App() {
                       )}
 
                       <div className="border-t border-slate-200 dark:border-slate-700 pt-6 mt-2">
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                          Enter Tax Basis Amount (₱):
-                        </label>
-                        <div className="flex gap-4 items-center">
-                          <CurrencyInput value={taxBasisInput ?? 0} onChange={setTaxBasisInput} currencySymbol="₱" />
-                          <button 
-                            onClick={calculateTax} 
-                            className={`bg-tangerine hover:opacity-90 text-white px-6 py-2 rounded-md font-medium transition-colors`}
-                          >
-                            Calculate & Add to Ledger
-                          </button>
-                        </div>
+                        {activeTaxSubTab === 'vat' ? (
+                          <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                  Vatable Sales (Output) ₱:
+                                </label>
+                                <div className="flex bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 focus-within:ring-1 focus-within:ring-blue-500">
+                                   <CurrencyInput value={vatSales} onChange={setVatSales} currencySymbol="₱" showSymbol={false} className="w-full text-right outline-none bg-transparent" />
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1 text-right">
+                                   Output Tax: ₱{(vatSales * ((flatTaxRates.vat.find(t => t.id === selectedFlatTax) || flatTaxRates.vat[0]).rate / 100)).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                  Vatable Purchases (Input) ₱:
+                                </label>
+                                <div className="flex bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 focus-within:ring-1 focus-within:ring-blue-500">
+                                   <CurrencyInput value={vatPurchases} onChange={setVatPurchases} currencySymbol="₱" showSymbol={false} className="w-full text-right outline-none bg-transparent" />
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1 text-right">
+                                   Input Tax: ₱{(vatPurchases * 0.12).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex justify-end">
+                              <button 
+                                onClick={calculateTax} 
+                                className={`bg-tangerine hover:opacity-90 text-white px-6 py-2 rounded-md font-medium transition-colors`}
+                              >
+                                Calculate Net VAT & Add to Ledger
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                              Enter Tax Basis Amount (₱):
+                            </label>
+                            <div className="flex gap-4 items-center">
+                              <div className="flex bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 focus-within:ring-1 focus-within:ring-blue-500">
+                                <CurrencyInput value={taxBasisInput ?? 0} onChange={setTaxBasisInput} currencySymbol="₱" showSymbol={false} className="w-32 text-right outline-none bg-transparent" />
+                              </div>
+                              <button 
+                                onClick={calculateTax} 
+                                className={`bg-tangerine hover:opacity-90 text-white px-6 py-2 rounded-md font-medium transition-colors`}
+                              >
+                                Calculate & Add to Ledger
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -2829,7 +2944,7 @@ export default function App() {
                             <tr>
                               <td colSpan="3" className="px-4 py-3 text-right">Total Tax Liability:</td>
                               <td className="px-4 py-3 text-right text-lg text-red-600 dark:text-red-400 font-mono">
-                                ₱{sum(taxLedger, 'computed').toLocaleString('en-US', {minimumFractionDigits: 2})}
+                                ₱{taxLedger.reduce((acc, curr) => acc + (curr.computed || 0), 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
                               </td>
                               <td></td>
                             </tr>
@@ -3126,12 +3241,15 @@ export default function App() {
                     </div>
                     <div className="lg:col-span-2">
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Daily Rate Base</label>
-                      <input 
-                        type="number" 
-                        value={calcState.dailyRate ?? 0} 
-                        onChange={(e) => setCalcState({...calcState, dailyRate: Number(e.target.value)})} 
-                        className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm focus:outline-blue-500 font-mono" 
-                      />
+                      <div className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 flex items-center focus-within:ring-1 focus-within:ring-blue-500">
+                        <CurrencyInput 
+                          value={calcState.dailyRate ?? 0} 
+                          onChange={(v) => setCalcState({...calcState, dailyRate: v})} 
+                          showSymbol={false}
+                          currencySymbol="₱"
+                          className="w-full text-right outline-none bg-transparent font-mono" 
+                        />
+                      </div>
                     </div>
                     <div className="lg:col-span-3">
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">OT Hrs & Multiplier</label>
@@ -3365,7 +3483,33 @@ export default function App() {
 
                  {/* Product Information */}
                  <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg border border-slate-200 dark:border-slate-700 mb-8">
-                    <h3 className="font-bold text-sm mb-4 border-b border-slate-200 dark:border-slate-600 pb-2 uppercase tracking-wide">Product Information</h3>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b border-slate-200 dark:border-slate-600 pb-2 gap-4">
+                      <h3 className="font-bold text-sm uppercase tracking-wide">Product Information</h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select 
+                          value={savedProducts.some(p => p.productId === costingData.productId) ? costingData.productId : ''} 
+                          onChange={(e) => handleLoadProduct(e.target.value)}
+                          className="bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1.5 text-xs focus:outline-blueJeans min-w-[200px]"
+                        >
+                          <option value="" disabled>-- Load Saved Product --</option>
+                          {savedProducts.map(p => (
+                            <option key={p.productId} value={p.productId}>{p.productId} - {p.productName}</option>
+                          ))}
+                        </select>
+                        <button 
+                          onClick={handleSaveProduct}
+                          className="flex items-center gap-1 bg-blueJeans hover:bg-blue-800 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-sm"
+                        >
+                          <Save size={14}/> Save
+                        </button>
+                        <button 
+                          onClick={handleNewProduct}
+                          className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-sm"
+                        >
+                          <Plus size={14}/> New
+                        </button>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                        <label className="flex items-center text-sm font-medium gap-4">
                          <span className="w-32">Product ID:</span> 
