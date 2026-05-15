@@ -10,7 +10,7 @@ const CURRENCIES = [
   { code: 'GBP', name: 'British Pound', symbol: '£' },
 ];
 
-const AUTHORIZED_USERS = ['KSD Bellen', 'EJ Lacson', 'JL Monleon', 'ML Burgos', 'L Calvo', 'IP Logroño'];
+const AUTHORIZED_USERS = ['KSD Bellen', 'EJ Lacson', 'JL Monleon', 'ML Burgos', 'L Calvo'];
 
 const LEGAL_DISCLAIMER = "LEGAL DISCLAIMER: Any unauthorized distribution, reproduction, or dissemination of this link or its contents without the explicit notice and consent of the owner is considered illegal and strictly prohibited. Violators will be subject to appropriate legal action under the Intellectual Property Code of the Philippines (Republic Act No. 8293, Sec. 177).";
 
@@ -47,6 +47,104 @@ const PREMIUM_RATES = [
   { value: 3.718, label: '3.718x (Reg Hol on Rest Day + OT + ND)' },
 ];
 
+// --- HELPER COMPONENTS (Moved outside to prevent re-mount focus issues) ---
+const handleItemChange = (setState, category, id, field, value) => {
+  setState(prev => ({
+    ...prev,
+    [category]: prev[category].map(item => item.id === id ? { ...item, [field]: value } : item)
+  }));
+};
+
+const addItem = (setState, category) => {
+  setState(prev => ({ ...prev, [category]: [...prev[category], { id: Date.now(), name: 'New Item', amount1: 0, amount2: 0 }] }));
+};
+
+const removeItem = (setState, category, id) => {
+  setState(prev => ({ ...prev, [category]: prev[category].filter(item => item.id !== id) }));
+};
+
+const SectionHeader = ({ title, isDarkMode }) => (
+  <div className={`font-bold border-b-[1.5px] pb-1 mt-6 mb-2 text-sm uppercase tracking-wider ${isDarkMode ? `border-goldenYellow text-goldenYellow` : `border-blueVelvet text-blueVelvet`}`}>
+    {title}
+  </div>
+);
+
+const DynamicList = ({ items, category, setState, isDeductible = false, currencySymbolStr, isTwoYear }) => {
+  return (
+    <div className="space-y-1 mb-4">
+      {items.map((item, index) => (
+        <div key={item.id} className="flex items-center justify-between group hover:bg-slate-50 dark:hover:bg-slate-800/50 py-1 -mx-2 px-2 rounded">
+          <input
+            type="text"
+            value={item.name ?? ''}
+            onChange={(e) => handleItemChange(setState, category, item.id, 'name', e.target.value)}
+            className={`flex-1 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blueJeans focus:outline-none transition-colors text-sm dark:text-slate-200`}
+            placeholder="Line Item Name"
+          />
+          <div className="flex items-center gap-4">
+            <CurrencyInput value={item.amount1 ?? 0} onChange={(val) => handleItemChange(setState, category, item.id, 'amount1', val)} currencySymbol={currencySymbolStr} showSymbol={index === 0} isDeductible={isDeductible} />
+            {isTwoYear && (
+              <CurrencyInput value={item.amount2 ?? 0} onChange={(val) => handleItemChange(setState, category, item.id, 'amount2', val)} currencySymbol={currencySymbolStr} showSymbol={index === 0} isDeductible={isDeductible} />
+            )}
+            <button onClick={() => removeItem(setState, category, item.id)} className="w-5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+          </div>
+        </div>
+      ))}
+      <button onClick={() => addItem(setState, category)} className={`text-xs hover:opacity-80 flex items-center gap-1 font-medium mt-1 text-tangerine`}>
+        <Plus size={14} /> Add Line Item
+      </button>
+    </div>
+  );
+};
+
+const TotalRow = ({ label, amount1, amount2, isFinal = false, isDarkMode, currencySymbolStr, isTwoYear }) => {
+  return (
+    <div className={`flex justify-between items-end py-1 mt-2 text-sm ${isFinal ? 'font-bold' : 'font-semibold'} dark:text-slate-200`}>
+      <span>{label}</span>
+      <div className="flex items-center gap-4">
+        <div className="relative min-w-[120px] flex justify-end pb-1 pt-1">
+           <div className={`absolute top-0 left-0 right-0 h-[1px] ${isFinal ? (isDarkMode ? 'bg-slate-200' : 'bg-slate-900') : 'bg-slate-300'}`}></div>
+           <CurrencyInput value={amount1 ?? 0} onChange={()=>{}} currencySymbol={currencySymbolStr} showSymbol={true} readOnly={true} />
+           {isFinal && (
+             <>
+               <div className={`absolute bottom-[2px] left-0 right-0 h-[1px] ${isDarkMode ? 'bg-slate-200' : 'bg-slate-900'}`}></div>
+               <div className={`absolute bottom-0 left-0 right-0 h-[1px] ${isDarkMode ? 'bg-slate-200' : 'bg-slate-900'}`}></div>
+             </>
+           )}
+        </div>
+        {isTwoYear && (
+          <div className="relative min-w-[120px] flex justify-end pb-1 pt-1">
+             <div className={`absolute top-0 left-0 right-0 h-[1px] ${isFinal ? (isDarkMode ? 'bg-slate-200' : 'bg-slate-900') : 'bg-slate-300'}`}></div>
+             <CurrencyInput value={amount2 ?? 0} onChange={()=>{}} currencySymbol={currencySymbolStr} showSymbol={true} readOnly={true} />
+             {isFinal && (
+               <>
+                 <div className={`absolute bottom-[2px] left-0 right-0 h-[1px] ${isDarkMode ? 'bg-slate-200' : 'bg-slate-900'}`}></div>
+                 <div className={`absolute bottom-0 left-0 right-0 h-[1px] ${isDarkMode ? 'bg-slate-200' : 'bg-slate-900'}`}></div>
+               </>
+             )}
+          </div>
+        )}
+        <div className="w-5" />
+      </div>
+    </div>
+  );
+};
+
+const LinkedRow = ({ label, amount1, amount2, isDarkMode, currencySymbolStr, isTwoYear }) => {
+  return (
+    <div className={`flex justify-between items-center py-1 text-sm border-y border-transparent ${isDarkMode ? `bg-blueVelvet/30 text-slate-200` : `bg-blueJeans/10`}`}>
+      <span className="flex items-center gap-2 italic">
+        {label} <span className={`text-[10px] px-1.5 py-0.5 rounded-full not-italic ${isDarkMode ? `bg-blueVelvet text-goldenYellow` : `bg-blueJeans/20 text-blueVelvet`}`}>Auto</span>
+      </span>
+      <div className="flex items-center gap-4">
+        <CurrencyInput value={amount1 ?? 0} onChange={()=>{}} currencySymbol={currencySymbolStr} showSymbol={false} readOnly={true} />
+        {isTwoYear && <CurrencyInput value={amount2 ?? 0} onChange={()=>{}} currencySymbol={currencySymbolStr} showSymbol={false} readOnly={true} />}
+        <div className="w-5" />
+      </div>
+    </div>
+  );
+};
+
 // --- CUSTOM INPUT COMPONENT ---
 const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isDeductible = false, readOnly = false }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -62,11 +160,42 @@ const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isD
     }
   }, [value, isFocused, isDeductible]);
 
-  const handleChange = (e) => setLocalStr(e.target.value);
+  const handleChange = (e) => {
+    let val = e.target.value;
+    let isNegative = val.startsWith('-') || val.includes('(');
+    
+    // Clean non-numeric characters (except period)
+    let clean = val.replace(/[^0-9.]/g, '');
+    
+    // Handle multiple periods
+    let parts = clean.split('.');
+    if (parts.length > 2) {
+      parts = [parts[0], parts.slice(1).join('')];
+    }
+    
+    // Apply commas to the whole number part
+    if (parts[0]) {
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+    
+    let finalStr = parts.join('.');
+    if (isNegative && finalStr) finalStr = '-' + finalStr;
+    
+    setLocalStr(finalStr);
+  };
 
   const handleFocus = () => {
     setIsFocused(true);
-    setLocalStr(value === 0 || value === null || value === undefined ? '' : Number(value).toString());
+    if (value === 0 || value === null || value === undefined) {
+       setLocalStr('');
+       return;
+    }
+    let clean = Number(value).toString();
+    let isNeg = clean.startsWith('-');
+    clean = clean.replace('-', '');
+    let parts = clean.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    setLocalStr((isNeg ? '-' : '') + parts.join('.'));
   };
 
   const handleBlur = () => {
@@ -93,7 +222,7 @@ const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isD
     <div className="flex items-center gap-1">
       <span className={`text-sm select-none ${showSymbol ? 'text-slate-500 dark:text-slate-400' : 'text-transparent'}`}>{currencySymbol}</span>
       <input
-        type={isFocused ? "number" : "text"}
+        type="text"
         value={localStr ?? ''}
         onChange={handleChange}
         onFocus={handleFocus}
@@ -1179,103 +1308,6 @@ export default function XeiaFinance() {
     }
   };
 
-  // --- HELPER COMPONENTS ---
-  const handleItemChange = (setState, category, id, field, value) => {
-    setState(prev => ({
-      ...prev,
-      [category]: prev[category].map(item => item.id === id ? { ...item, [field]: value } : item)
-    }));
-  };
-
-  const addItem = (setState, category) => {
-    setState(prev => ({ ...prev, [category]: [...prev[category], { id: Date.now(), name: 'New Item', amount1: 0, amount2: 0 }] }));
-  };
-  const removeItem = (setState, category, id) => {
-    setState(prev => ({ ...prev, [category]: prev[category].filter(item => item.id !== id) }));
-  };
-
-  const SectionHeader = ({ title }) => (
-    <div className={`font-bold border-b-[1.5px] pb-1 mt-6 mb-2 text-sm uppercase tracking-wider ${isDarkMode ? `border-goldenYellow text-goldenYellow` : `border-blueVelvet text-blueVelvet`}`}>
-      {title}
-    </div>
-  );
-
-  const DynamicList = ({ items, category, setState, isDeductible = false }) => {
-    return (
-      <div className="space-y-1 mb-4">
-        {items.map((item, index) => (
-          <div key={item.id} className="flex items-center justify-between group hover:bg-slate-50 dark:hover:bg-slate-800/50 py-1 -mx-2 px-2 rounded">
-            <input
-              type="text"
-              value={item.name ?? ''}
-              onChange={(e) => handleItemChange(setState, category, item.id, 'name', e.target.value)}
-              className={`flex-1 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blueJeans focus:outline-none transition-colors text-sm dark:text-slate-200`}
-              placeholder="Line Item Name"
-            />
-            <div className="flex items-center gap-4">
-              <CurrencyInput value={item.amount1 ?? 0} onChange={(val) => handleItemChange(setState, category, item.id, 'amount1', val)} currencySymbol={currencySymbolStr} showSymbol={index === 0} isDeductible={isDeductible} />
-              {isTwoYear && (
-                <CurrencyInput value={item.amount2 ?? 0} onChange={(val) => handleItemChange(setState, category, item.id, 'amount2', val)} currencySymbol={currencySymbolStr} showSymbol={index === 0} isDeductible={isDeductible} />
-              )}
-              <button onClick={() => removeItem(setState, category, item.id)} className="w-5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
-            </div>
-          </div>
-        ))}
-        <button onClick={() => addItem(setState, category)} className={`text-xs hover:opacity-80 flex items-center gap-1 font-medium mt-1 text-tangerine`}>
-          <Plus size={14} /> Add Line Item
-        </button>
-      </div>
-    );
-  };
-
-  const TotalRow = ({ label, amount1, amount2, isFinal = false }) => {
-    return (
-      <div className={`flex justify-between items-end py-1 mt-2 text-sm ${isFinal ? 'font-bold' : 'font-semibold'} dark:text-slate-200`}>
-        <span>{label}</span>
-        <div className="flex items-center gap-4">
-          <div className="relative min-w-[120px] flex justify-end pb-1 pt-1">
-             <div className={`absolute top-0 left-0 right-0 h-[1px] ${isFinal ? (isDarkMode ? 'bg-slate-200' : 'bg-slate-900') : 'bg-slate-300'}`}></div>
-             <CurrencyInput value={amount1 ?? 0} onChange={()=>{}} currencySymbol={currencySymbolStr} showSymbol={true} readOnly={true} />
-             {isFinal && (
-               <>
-                 <div className={`absolute bottom-[2px] left-0 right-0 h-[1px] ${isDarkMode ? 'bg-slate-200' : 'bg-slate-900'}`}></div>
-                 <div className={`absolute bottom-0 left-0 right-0 h-[1px] ${isDarkMode ? 'bg-slate-200' : 'bg-slate-900'}`}></div>
-               </>
-             )}
-          </div>
-          {isTwoYear && (
-            <div className="relative min-w-[120px] flex justify-end pb-1 pt-1">
-               <div className={`absolute top-0 left-0 right-0 h-[1px] ${isFinal ? (isDarkMode ? 'bg-slate-200' : 'bg-slate-900') : 'bg-slate-300'}`}></div>
-               <CurrencyInput value={amount2 ?? 0} onChange={()=>{}} currencySymbol={currencySymbolStr} showSymbol={true} readOnly={true} />
-               {isFinal && (
-                 <>
-                   <div className={`absolute bottom-[2px] left-0 right-0 h-[1px] ${isDarkMode ? 'bg-slate-200' : 'bg-slate-900'}`}></div>
-                   <div className={`absolute bottom-0 left-0 right-0 h-[1px] ${isDarkMode ? 'bg-slate-200' : 'bg-slate-900'}`}></div>
-                 </>
-               )}
-            </div>
-          )}
-          <div className="w-5" />
-        </div>
-      </div>
-    );
-  };
-
-  const LinkedRow = ({ label, amount1, amount2 }) => {
-    return (
-      <div className={`flex justify-between items-center py-1 text-sm border-y border-transparent ${isDarkMode ? `bg-blueVelvet/30 text-slate-200` : `bg-blueJeans/10`}`}>
-        <span className="flex items-center gap-2 italic">
-          {label} <span className={`text-[10px] px-1.5 py-0.5 rounded-full not-italic ${isDarkMode ? `bg-blueVelvet text-goldenYellow` : `bg-blueJeans/20 text-blueVelvet`}`}>Auto</span>
-        </span>
-        <div className="flex items-center gap-4">
-          <CurrencyInput value={amount1 ?? 0} onChange={()=>{}} currencySymbol={currencySymbolStr} showSymbol={false} readOnly={true} />
-          {isTwoYear && <CurrencyInput value={amount2 ?? 0} onChange={()=>{}} currencySymbol={currencySymbolStr} showSymbol={false} readOnly={true} />}
-          <div className="w-5" />
-        </div>
-      </div>
-    );
-  };
-
   // --- LOGIN SCREEN ---
   if (!isAuthenticated) {
     return (
@@ -1317,7 +1349,7 @@ export default function XeiaFinance() {
             </button>
           </form>
         </div>
-        <p className="mt-8 text-xs text-center max-w-2xl opacity-70 leading-relaxed px-4">
+        <p className="mt-8 text-xs text-center max-w-2xl opacity-70 leading-relaxed px-4 text-white">
           {LEGAL_DISCLAIMER}
         </p>
       </div>
@@ -1467,17 +1499,17 @@ export default function XeiaFinance() {
                       <div className="w-5" />
                     </div>
 
-                    <SectionHeader title="ASSETS" />
+                    <SectionHeader isDarkMode={isDarkMode} title="ASSETS" />
                     <div className="font-semibold text-xs text-slate-700 dark:text-slate-400 mb-1 mt-2">Current Assets</div>
-                    <LinkedRow label="Cash & Equivalents" amount1={endCash1} amount2={endCash2} />
-                    <DynamicList items={bsData.currentAssets} category="currentAssets" setState={setBsData} />
-                    <TotalRow label="Total Current Assets" amount1={ca1} amount2={ca2} />
+                    <LinkedRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Cash & Equivalents" amount1={endCash1} amount2={endCash2} />
+                    <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={bsData.currentAssets} category="currentAssets" setState={setBsData} />
+                    <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Total Current Assets" amount1={ca1} amount2={ca2} />
 
                     <div className="font-semibold text-xs text-slate-700 dark:text-slate-400 mb-1 mt-6">Noncurrent Assets</div>
-                    <DynamicList items={bsData.nonCurrentAssets} category="nonCurrentAssets" setState={setBsData} />
-                    <TotalRow label="Total Noncurrent Assets" amount1={nca1} amount2={nca2} />
+                    <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={bsData.nonCurrentAssets} category="nonCurrentAssets" setState={setBsData} />
+                    <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Total Noncurrent Assets" amount1={nca1} amount2={nca2} />
                     
-                    <div className="mt-8"><TotalRow label="TOTAL ASSETS" amount1={ta1} amount2={ta2} isFinal /></div>
+                    <div className="mt-8"><TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="TOTAL ASSETS" amount1={ta1} amount2={ta2} isFinal /></div>
                   </div>
 
                   <div>
@@ -1487,20 +1519,20 @@ export default function XeiaFinance() {
                       <div className="w-5" />
                     </div>
 
-                    <SectionHeader title="LIABILITIES AND EQUITY" />
+                    <SectionHeader isDarkMode={isDarkMode} title="LIABILITIES AND EQUITY" />
                     <div className="font-semibold text-xs text-slate-700 dark:text-slate-400 mb-1 mt-2">Current Liabilities</div>
-                    <DynamicList items={bsData.currentLiabilities} category="currentLiabilities" setState={setBsData} />
-                    <TotalRow label="Total Current Liabilities" amount1={cl1} amount2={cl2} />
+                    <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={bsData.currentLiabilities} category="currentLiabilities" setState={setBsData} />
+                    <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Total Current Liabilities" amount1={cl1} amount2={cl2} />
 
                     <div className="font-semibold text-xs text-slate-700 dark:text-slate-400 mb-1 mt-6">Noncurrent Liabilities</div>
-                    <DynamicList items={bsData.nonCurrentLiabilities} category="nonCurrentLiabilities" setState={setBsData} />
-                    <TotalRow label="Total Noncurrent Liabilities" amount1={ncl1} amount2={ncl2} />
-                    <TotalRow label="Total Liabilities" amount1={tl1} amount2={tl2} />
+                    <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={bsData.nonCurrentLiabilities} category="nonCurrentLiabilities" setState={setBsData} />
+                    <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Total Noncurrent Liabilities" amount1={ncl1} amount2={ncl2} />
+                    <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Total Liabilities" amount1={tl1} amount2={tl2} />
 
                     <div className="font-semibold text-xs text-slate-700 dark:text-slate-400 mb-1 mt-6">Equity</div>
-                    <LinkedRow label="Total Capital (Retained Earnings)" amount1={endEq1} amount2={endEq2} />
+                    <LinkedRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Total Capital (Retained Earnings)" amount1={endEq1} amount2={endEq2} />
                     
-                    <div className="mt-8"><TotalRow label="TOTAL LIABILITIES & EQUITY" amount1={tle1} amount2={tle2} isFinal /></div>
+                    <div className="mt-8"><TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="TOTAL LIABILITIES & EQUITY" amount1={tle1} amount2={tle2} isFinal /></div>
                   </div>
                 </div>
               </div>
@@ -1518,25 +1550,25 @@ export default function XeiaFinance() {
             {/* 2. STATEMENT OF COMPREHENSIVE INCOME */}
             {activeTab === 'spl' && (
               <div className="mb-16">
-                <SectionHeader title="Revenues" />
-                <DynamicList items={splData.revenues} category="revenues" setState={setSplData} />
-                <TotalRow label="Total Revenues" amount1={rev1} amount2={rev2} />
+                <SectionHeader isDarkMode={isDarkMode} title="Revenues" />
+                <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={splData.revenues} category="revenues" setState={setSplData} />
+                <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Total Revenues" amount1={rev1} amount2={rev2} />
 
-                <SectionHeader title="Cost of Sales" />
-                <DynamicList items={splData.cogs} category="cogs" setState={setSplData} isDeductible />
-                <TotalRow label="Gross Profit" amount1={gp1} amount2={gp2} />
+                <SectionHeader isDarkMode={isDarkMode} title="Cost of Sales" />
+                <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={splData.cogs} category="cogs" setState={setSplData} isDeductible />
+                <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Gross Profit" amount1={gp1} amount2={gp2} />
 
-                <SectionHeader title="Operating Expenses" />
-                <DynamicList items={splData.expenses} category="expenses" setState={setSplData} isDeductible />
+                <SectionHeader isDarkMode={isDarkMode} title="Operating Expenses" />
+                <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={splData.expenses} category="expenses" setState={setSplData} isDeductible />
                 
-                <TotalRow label="Net Income / (Loss)" amount1={ni1} amount2={ni2} />
+                <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Net Income / (Loss)" amount1={ni1} amount2={ni2} />
 
-                <SectionHeader title="Other Comprehensive Income" />
-                <DynamicList items={splData.oci} category="oci" setState={setSplData} />
-                <TotalRow label="Total Other Comprehensive Income" amount1={oci1} amount2={oci2} />
+                <SectionHeader isDarkMode={isDarkMode} title="Other Comprehensive Income" />
+                <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={splData.oci} category="oci" setState={setSplData} />
+                <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Total Other Comprehensive Income" amount1={oci1} amount2={oci2} />
 
                 <div className="mt-8">
-                  <TotalRow label="Comprehensive Income" amount1={compInc1} amount2={compInc2} isFinal />
+                  <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Comprehensive Income" amount1={compInc1} amount2={compInc2} isFinal />
                 </div>
               </div>
             )}
@@ -1552,13 +1584,13 @@ export default function XeiaFinance() {
                     <div className="w-5"/>
                   </div>
                 </div>
-                <SectionHeader title="Additions" />
-                <LinkedRow label="Net Income" amount1={ni1} amount2={ni2} />
-                <LinkedRow label="Other Comprehensive Income" amount1={oci1} amount2={oci2} />
-                <DynamicList items={sceData.investments} category="investments" setState={setSceData} />
-                <SectionHeader title="Deductions" />
-                <DynamicList items={sceData.dividends} category="dividends" setState={setSceData} isDeductible />
-                <TotalRow label="Ending Capital (Equity)" amount1={endEq1} amount2={endEq2} isFinal />
+                <SectionHeader isDarkMode={isDarkMode} title="Additions" />
+                <LinkedRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Net Income" amount1={ni1} amount2={ni2} />
+                <LinkedRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Other Comprehensive Income" amount1={oci1} amount2={oci2} />
+                <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={sceData.investments} category="investments" setState={setSceData} />
+                <SectionHeader isDarkMode={isDarkMode} title="Deductions" />
+                <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={sceData.dividends} category="dividends" setState={setSceData} isDeductible />
+                <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Ending Capital (Equity)" amount1={endEq1} amount2={endEq2} isFinal />
               </div>
             )}
 
@@ -1573,20 +1605,20 @@ export default function XeiaFinance() {
                     <div className="w-5"/>
                   </div>
                 </div>
-                <SectionHeader title="Cash Flows from Operating Activities" />
-                <LinkedRow label="Net Income" amount1={ni1} amount2={ni2} />
-                <DynamicList items={cfData.operating} category="operating" setState={setCfData} />
-                <TotalRow label="Net Cash from Operating Activities" amount1={opCF1} amount2={opCF2} />
-                <SectionHeader title="Cash Flows from Investing Activities" />
-                <DynamicList items={cfData.investing} category="investing" setState={setCfData} />
-                <TotalRow label="Net Cash from Investing Activities" amount1={invCF1} amount2={invCF2} />
-                <SectionHeader title="Cash Flows from Financing Activities" />
-                <DynamicList items={cfData.financing} category="financing" setState={setCfData} />
-                <LinkedRow label="Less: Dividends Paid" amount1={-div1} amount2={-div2} />
-                <TotalRow label="Net Cash from Financing Activities" amount1={finCF1} amount2={finCF2} />
+                <SectionHeader isDarkMode={isDarkMode} title="Cash Flows from Operating Activities" />
+                <LinkedRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Net Income" amount1={ni1} amount2={ni2} />
+                <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={cfData.operating} category="operating" setState={setCfData} />
+                <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Net Cash from Operating Activities" amount1={opCF1} amount2={opCF2} />
+                <SectionHeader isDarkMode={isDarkMode} title="Cash Flows from Investing Activities" />
+                <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={cfData.investing} category="investing" setState={setCfData} />
+                <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Net Cash from Investing Activities" amount1={invCF1} amount2={invCF2} />
+                <SectionHeader isDarkMode={isDarkMode} title="Cash Flows from Financing Activities" />
+                <DynamicList currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} items={cfData.financing} category="financing" setState={setCfData} />
+                <LinkedRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Less: Dividends Paid" amount1={-div1} amount2={-div2} />
+                <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Net Cash from Financing Activities" amount1={finCF1} amount2={finCF2} />
                 <div className="mt-6">
-                  <TotalRow label="Net Increase (Decrease) in Cash" amount1={netCash1} amount2={netCash2} />
-                  <TotalRow label="Ending Cash Balance" amount1={endCash1} amount2={endCash2} isFinal />
+                  <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Net Increase (Decrease) in Cash" amount1={netCash1} amount2={netCash2} />
+                  <TotalRow isDarkMode={isDarkMode} currencySymbolStr={currencySymbolStr} isTwoYear={isTwoYear} label="Ending Cash Balance" amount1={endCash1} amount2={endCash2} isFinal />
                 </div>
               </div>
             )}
@@ -1608,7 +1640,7 @@ export default function XeiaFinance() {
                   )}
                 </div>
                 
-                <SectionHeader title="Key Financial Performance Indicators" />
+                <SectionHeader isDarkMode={isDarkMode} title="Key Financial Performance Indicators" />
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-4">
                   {[
                     { label: 'Current Ratio', f1: ca1/cl1, f2: ca2/cl2, suffix: 'x' },
@@ -1639,7 +1671,7 @@ export default function XeiaFinance() {
                 <div className={`mt-8 grid grid-cols-1 ${isTwoYear ? 'md:grid-cols-2' : ''} gap-8`}>
                   {isTwoYear && (
                     <div>
-                      <SectionHeader title="Horizontal Analysis (YoY Change)" />
+                      <SectionHeader isDarkMode={isDarkMode} title="Horizontal Analysis (YoY Change)" />
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b-[1.5px] border-slate-800 dark:border-slate-400 text-left text-xs font-bold">
@@ -1674,7 +1706,7 @@ export default function XeiaFinance() {
                   )}
 
                   <div>
-                    <SectionHeader title={`Vertical Analysis (${year1})`} />
+                    <SectionHeader isDarkMode={isDarkMode} title={`Vertical Analysis (${year1})`} />
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b-[1.5px] border-slate-800 dark:border-slate-400 text-left text-xs font-bold">
@@ -1706,7 +1738,7 @@ export default function XeiaFinance() {
 
                 {/* --- NEW RATIOS CHART --- */}
                 <div className="mt-8">
-                  <SectionHeader title="Financial Overview Chart" />
+                  <SectionHeader isDarkMode={isDarkMode} title="Financial Overview Chart" />
                   <div className="h-80 w-full bg-slate-50 dark:bg-slate-700/30 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={[
@@ -2178,7 +2210,7 @@ export default function XeiaFinance() {
                 {/* Reference Tables for Payroll */}
                 <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8 print:mt-8">
                   <div>
-                    <SectionHeader title="Statutory Overtime & ND Multipliers (Reference)" />
+                    <SectionHeader isDarkMode={isDarkMode} title="Statutory Overtime & ND Multipliers (Reference)" />
                     <table className="w-full text-sm mt-4 border border-slate-200 dark:border-slate-700">
                       <thead className={`bg-blueJeans text-white`}>
                         <tr className="text-left text-xs font-bold">
@@ -2197,7 +2229,7 @@ export default function XeiaFinance() {
                   </div>
 
                   <div>
-                    <SectionHeader title="Government Contribution Bases (Reference)" />
+                    <SectionHeader isDarkMode={isDarkMode} title="Government Contribution Bases (Reference)" />
                     <table className="w-full text-sm mt-4 border border-slate-200 dark:border-slate-700">
                       <thead className={`bg-blueJeans text-white`}>
                         <tr className="text-left text-xs font-bold">
