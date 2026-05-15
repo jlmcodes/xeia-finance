@@ -10,11 +10,20 @@ import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, deleteDoc } 
 // --- FIREBASE INITIALIZATION ---
 let app, auth, db, appId;
 try {
-  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+  const firebaseConfig = {
+    apiKey: "AIzaSyDsRJfZ_dROleDsVW_w0K9EVzJSbDugemE",
+    authDomain: "xeia-finance.firebaseapp.com",
+    projectId: "xeia-finance",
+    storageBucket: "xeia-finance.firebasestorage.app",
+    messagingSenderId: "295169710338",
+    appId: "1:295169710338:web:714517ba995280e9890a1b",
+    measurementId: "G-V4M98SKG49"
+  };
+  
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
-  appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  appId = "xeia-finance-app"; 
 } catch (e) {
   console.error("Firebase init error", e);
 }
@@ -337,7 +346,7 @@ export default function XeiaFinance() {
   const [ratioData, setRatioData] = useState({ initialInvestment1: 500000, initialInvestment2: 500000 });
 
   // TAX TAB STATES 
-  const [activeTaxSubTab, useStateActiveTaxSubTab] = useState('income');
+  const [activeTaxSubTab, setActiveTaxSubTab] = useState('income');
   const [taxLedger, setTaxLedger] = useState([]);
   const [taxBasisInput, setTaxBasisInput] = useState(0);
 
@@ -1535,14 +1544,17 @@ export default function XeiaFinance() {
         className="min-h-screen flex flex-col justify-center items-center p-4 relative bg-cover bg-center"
         style={{ backgroundImage: "url('/background.jpg')" }}
       >
+        {/* This creates a sleek, semi-transparent dark blue overlay so the white login box still pops against the photo */}
         <div className="absolute inset-0 bg-blueVelvet/80 z-0"></div>
         
         <div className="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-2xl max-w-md w-full text-slate-800 dark:text-slate-100 relative z-10">
+            {/* --- UPDATED STACKED LOGO SECTION --- */}
             <div className="flex flex-col items-center justify-center mb-6 text-center">
               <img src="/logo-1.png" alt="Xeia Finance Logo" className="h-20 w-auto object-contain mb-3" />
               <h1 className="text-3xl font-bold text-blueVelvet dark:text-goldenYellow mb-1">Xeia Finance</h1>
               <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">Powered and Owned by Jaynard L. Monleon</p>
             </div>
+            {/* ------------------------------------ */}
             
             <h2 className="text-center font-semibold mb-6">Authorized Access Only</h2>
           <form onSubmit={handleLogin} className="space-y-4">
