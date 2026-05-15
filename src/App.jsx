@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Calculator, DollarSign, Building2, LineChart, FileText, PieChart, Receipt, FileSpreadsheet, ToggleLeft, ToggleRight, CheckSquare, Square, Users, Moon, Sun, Lock, Save, Upload, Package, TrendingUp, Archive, BookOpen, PanelRightClose, ArrowRightCircle, MessageSquare, Send } from 'lucide-react';
+import { Plus, Trash2, Calculator, DollarSign, Building2, LineChart, FileText, PieChart, Receipt, FileSpreadsheet, ToggleLeft, ToggleRight, CheckSquare, Square, Users, Moon, Sun, Lock, Save, Upload, Package, TrendingUp, Archive, BookOpen, PanelRightClose, ArrowRightCircle, MessageSquare, Send, Edit2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 
 // --- FIREBASE IMPORTS ---
@@ -278,6 +278,12 @@ export default function App() {
   const deviceId = useRef(Math.random().toString(36).substr(2, 9)); // Distinguish same account on diff tabs
   const [activeField, setActiveField] = useState(null); // Tracks specifically what area/field is being edited
 
+  const [userAliases, setUserAliases] = useState({});
+  const [isPresenceOpen, setIsPresenceOpen] = useState(false);
+  const [editingAliasId, setEditingAliasId] = useState(null);
+  const [aliasInput, setAliasInput] = useState('');
+  const presenceDropdownRef = useRef(null);
+
   // --- STATE MANAGEMENT ---
   const [companyName, setCompanyName] = useState('XEIA CORPORATION');
   const [dbaName, setDbaName] = useState('Doing business under the name and style of Xeia');
@@ -473,6 +479,17 @@ export default function App() {
     };
   }, []);
 
+  // Outside click handler for presence dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (presenceDropdownRef.current && !presenceDropdownRef.current.contains(event.target)) {
+        setIsPresenceOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Auth Initialization
   useEffect(() => {
     if (!auth) return;
@@ -622,6 +639,7 @@ export default function App() {
       await addDoc(chatCol, {
         text: chatInput,
         sender: loginName,
+        senderId: `${user.uid}_${deviceId.current}`,
         timestamp: Date.now()
       });
       setChatInput('');
@@ -1621,14 +1639,20 @@ export default function App() {
                       <PanelRightClose size={16} />
                    </div>
                    <div className="flex-1 p-3 overflow-y-auto bg-slate-50 dark:bg-slate-900 flex flex-col gap-3">
-                      {chatMessages.map(msg => (
-                         <div key={msg.id} className={`max-w-[85%] rounded-lg p-2 text-sm shadow-sm ${msg.sender === loginName ? 'bg-blueJeans text-white self-end rounded-br-none' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 self-start rounded-bl-none'}`}>
+                      {chatMessages.map(msg => {
+                         const myPresenceId = `${user?.uid}_${deviceId.current}`;
+                         const isMe = msg.senderId === myPresenceId || (!msg.senderId && msg.sender === loginName);
+                         const displayName = msg.senderId && userAliases[msg.senderId] ? userAliases[msg.senderId] : msg.sender;
+                         
+                         return (
+                         <div key={msg.id} className={`max-w-[85%] rounded-lg p-2 text-sm shadow-sm ${isMe ? 'bg-blueJeans text-white self-end rounded-br-none' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 self-start rounded-bl-none'}`}>
                             <div className="text-[10px] opacity-70 mb-0.5 font-bold flex justify-between items-center">
-                              <span>{msg.sender}</span>
+                              <span>{displayName}</span>
                             </div>
                             <div className="leading-snug">{msg.text}</div>
                          </div>
-                      ))}
+                         );
+                      })}
                       {chatMessages.length === 0 && <div className="text-center text-xs text-slate-400 mt-10">No messages yet. Start the conversation!</div>}
                    </div>
                    <form onSubmit={handleSendMessage} className="p-2 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex gap-2">
@@ -1669,7 +1693,7 @@ export default function App() {
         
         {/* Top Header */}
         <header className={`bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between overflow-x-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between overflow-visible">
             <div className="flex items-center gap-3 mr-4">
               <img src="/logo-1.png" alt="Xeia Finance Logo" className="h-10 w-auto object-contain shrink-0" />
               <div className="flex flex-col">
@@ -1680,13 +1704,14 @@ export default function App() {
             
             <div className="flex items-center gap-3 shrink-0">
               {/* LIVE PRESENCE INDICATOR (HEADER) */}
-              <div className="relative group cursor-pointer">
-                 <div className="flex items-center gap-1.5 mr-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 px-3 py-1 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300 shadow-sm">
+              <div className="relative cursor-pointer" ref={presenceDropdownRef}>
+                 <div onClick={() => setIsPresenceOpen(!isPresenceOpen)} className="flex items-center gap-1.5 mr-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 px-3 py-1 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300 shadow-sm hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors">
                     <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     {onlineUsers.length + 1} Online
                  </div>
                  {/* Dropdown Details for Collaborative Presence */}
-                 <div className="absolute top-full mt-2 right-0 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-50 p-3">
+                 {isPresenceOpen && (
+                 <div className="absolute top-full mt-2 right-0 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 p-3 cursor-default">
                     <div className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Active Collaborators</div>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                        <div className="flex flex-col p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800/30">
@@ -1695,14 +1720,39 @@ export default function App() {
                           {activeField && <span className="text-[10px] text-slate-500 font-medium text-tangerine truncate">Editing: {activeField}</span>}
                        </div>
                        {onlineUsers.map(u => (
-                          <div key={u.id} className="flex flex-col p-2 bg-slate-50 dark:bg-slate-700/30 rounded border border-slate-100 dark:border-slate-600/50">
-                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{u.name}</span>
+                          <div key={u.id} className="flex flex-col p-2 bg-slate-50 dark:bg-slate-700/30 rounded border border-slate-100 dark:border-slate-600/50 group/item">
+                             {editingAliasId === u.id ? (
+                               <form onSubmit={(e) => { 
+                                 e.preventDefault(); 
+                                 if(!aliasInput.trim()) {
+                                    const newA = {...userAliases}; delete newA[u.id]; setUserAliases(newA);
+                                 } else {
+                                    setUserAliases({...userAliases, [u.id]: aliasInput.trim()});
+                                 }
+                                 setEditingAliasId(null); 
+                               }} className="flex items-center mb-1">
+                                 <input autoFocus type="text" value={aliasInput} onChange={e => setAliasInput(e.target.value)} onBlur={() => {
+                                     if(!aliasInput.trim()) {
+                                        const newA = {...userAliases}; delete newA[u.id]; setUserAliases(newA);
+                                     } else {
+                                        setUserAliases({...userAliases, [u.id]: aliasInput.trim()});
+                                     }
+                                     setEditingAliasId(null);
+                                 }} className="w-full text-xs px-1.5 py-0.5 border border-slate-300 rounded focus:outline-none dark:bg-slate-800 dark:text-white dark:border-slate-600" />
+                               </form>
+                             ) : (
+                               <div className="flex justify-between items-center mb-1">
+                                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{userAliases[u.id] || u.name}</span>
+                                 <button onClick={(e) => { e.stopPropagation(); setEditingAliasId(u.id); setAliasInput(userAliases[u.id] || u.name); }} className="text-slate-400 hover:text-blueJeans dark:hover:text-goldenYellow opacity-0 group-hover/item:opacity-100 transition-opacity"><Edit2 size={12}/></button>
+                               </div>
+                             )}
                              <span className="text-[10px] text-slate-500 font-medium">Tab: <span className="uppercase text-slate-700 dark:text-slate-300">{u.tab}</span></span>
                              {u.field && <span className="text-[10px] text-slate-500 font-medium text-tangerine truncate">Editing: {u.field}</span>}
                           </div>
                        ))}
                     </div>
                  </div>
+                 )}
               </div>
 
               <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Toggle Dark Mode">
@@ -1770,11 +1820,14 @@ export default function App() {
                 <tab.icon size={16} /> {tab.label}
                 {/* LIVE PRESENCE INDICATORS PER TAB */}
                 <div className="flex -space-x-1 ml-1.5">
-                   {onlineUsers.filter(u => u.tab === tab.id).map((u, idx) => (
-                      <div key={idx} className="h-5 w-5 rounded-full bg-tangerine text-[9px] font-bold text-white flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm" title={`${u.name} is currently editing ${u.field ? `'${u.field}'` : 'this tab'}`}>
-                         {u.name.charAt(0).toUpperCase()}
+                   {onlineUsers.filter(u => u.tab === tab.id).map((u, idx) => {
+                      const displayN = userAliases[u.id] || u.name;
+                      return (
+                      <div key={idx} className="h-5 w-5 rounded-full bg-tangerine text-[9px] font-bold text-white flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm" title={`${displayN} is currently editing ${u.field ? `'${u.field}'` : 'this tab'}`}>
+                         {displayN.charAt(0).toUpperCase()}
                       </div>
-                   ))}
+                      )
+                   })}
                 </div>
               </button>
             ))}
