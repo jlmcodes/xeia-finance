@@ -278,10 +278,10 @@ export default function App() {
   const deviceId = useRef(Math.random().toString(36).substr(2, 9)); // Distinguish same account on diff tabs
   const [activeField, setActiveField] = useState(null); // Tracks specifically what area/field is being edited
 
-  const [userAliases, setUserAliases] = useState({});
+  const [displayName, setDisplayName] = useState('');
   const [isPresenceOpen, setIsPresenceOpen] = useState(false);
-  const [editingAliasId, setEditingAliasId] = useState(null);
-  const [aliasInput, setAliasInput] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newNameInput, setNewNameInput] = useState('');
   const presenceDropdownRef = useRef(null);
 
   // --- STATE MANAGEMENT ---
@@ -523,7 +523,7 @@ export default function App() {
     const presenceRef = doc(db, 'artifacts', appId, 'public', 'data', `presence_${workspaceId}`, myPresenceId);
     
     const updatePresence = () => {
-      setDoc(presenceRef, { name: loginName, tab: activeTab, field: activeField, timestamp: Date.now() }).catch(console.error);
+      setDoc(presenceRef, { name: displayName || loginName, tab: activeTab, field: activeField, timestamp: Date.now() }).catch(console.error);
     };
 
     updatePresence();
@@ -572,7 +572,7 @@ export default function App() {
       deleteDoc(presenceRef).catch(() => {});
       window.removeEventListener('beforeunload', handleUnload);
     };
-  }, [user, isAuthenticated, activeTab, activeField, loginName]);
+  }, [user, isAuthenticated, activeTab, activeField, loginName, displayName]);
 
   // Pull State Updates from Firebase
   useEffect(() => {
@@ -660,7 +660,7 @@ export default function App() {
       const chatCol = collection(db, 'artifacts', appId, 'public', 'data', `chat_${workspaceId}`);
       await addDoc(chatCol, {
         text: chatInput,
-        sender: loginName,
+        sender: displayName || loginName,
         senderId: `${user.uid}_${deviceId.current}`,
         timestamp: Date.now()
       });
@@ -674,6 +674,7 @@ export default function App() {
   const handleLogin = (e) => {
     e.preventDefault();
     if (AUTHORIZED_USERS.some(u => u.toLowerCase() === loginName.trim().toLowerCase())) {
+      setDisplayName(loginName.trim());
       setIsAuthenticated(true);
       setLoginError('');
     } else {
@@ -685,7 +686,9 @@ export default function App() {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      setLoginName(result.user.displayName || result.user.email);
+      const name = result.user.displayName || result.user.email;
+      setLoginName(name);
+      setDisplayName(name);
       setIsAuthenticated(true);
       setLoginError('');
     } catch (error) {
@@ -1664,12 +1667,15 @@ export default function App() {
                       {chatMessages.map(msg => {
                          const myPresenceId = `${user?.uid}_${deviceId.current}`;
                          const isMe = msg.senderId === myPresenceId || (!msg.senderId && msg.sender === loginName);
-                         const displayName = msg.senderId && userAliases[msg.senderId] ? userAliases[msg.senderId] : msg.sender;
+                         
+                         // Dynamically show the updated name if they are currently online, otherwise fallback to recorded name
+                         const senderOnlineUser = onlineUsers.find(ou => ou.id === msg.senderId);
+                         const displayN = isMe ? displayName : (senderOnlineUser ? senderOnlineUser.name : msg.sender);
                          
                          return (
                          <div key={msg.id} className={`max-w-[85%] rounded-lg p-2 text-sm shadow-sm ${isMe ? 'bg-blueJeans text-white self-end rounded-br-none' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 self-start rounded-bl-none'}`}>
                             <div className="text-[10px] opacity-70 mb-0.5 font-bold flex justify-between items-center">
-                              <span>{displayName}</span>
+                              <span>{displayN}</span>
                             </div>
                             <div className="leading-snug">{msg.text}</div>
                          </div>
@@ -1736,38 +1742,30 @@ export default function App() {
                  <div className="absolute top-full mt-2 right-0 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 p-3 cursor-default">
                     <div className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Active Collaborators</div>
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                       <div className="flex flex-col p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800/30">
-                          <span className="text-xs font-bold text-blueJeans dark:text-goldenYellow">{loginName} (You)</span>
+                       <div className="flex flex-col p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-800/30 group/item">
+                          {isEditingName ? (
+                            <form onSubmit={(e) => { 
+                              e.preventDefault(); 
+                              setDisplayName(newNameInput.trim() || loginName); 
+                              setIsEditingName(false); 
+                            }} className="flex items-center mb-1">
+                              <input autoFocus type="text" value={newNameInput} onChange={e => setNewNameInput(e.target.value)} onBlur={() => {
+                                  setDisplayName(newNameInput.trim() || loginName);
+                                  setIsEditingName(false);
+                              }} className="w-full text-xs px-1.5 py-0.5 border border-slate-300 rounded focus:outline-none dark:bg-slate-800 dark:text-white dark:border-slate-600" />
+                            </form>
+                          ) : (
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs font-bold text-blueJeans dark:text-goldenYellow">{displayName} (You)</span>
+                              <button onClick={(e) => { e.stopPropagation(); setIsEditingName(true); setNewNameInput(displayName); }} className="text-slate-400 hover:text-blueJeans dark:hover:text-goldenYellow opacity-0 group-hover/item:opacity-100 transition-opacity"><Edit2 size={12}/></button>
+                            </div>
+                          )}
                           <span className="text-[10px] text-slate-500 font-medium">Tab: <span className="uppercase text-slate-700 dark:text-slate-300">{activeTab}</span></span>
                           {activeField && <span className="text-[10px] text-slate-500 font-medium text-tangerine truncate">Editing: {activeField}</span>}
                        </div>
                        {onlineUsers.map(u => (
-                          <div key={u.id} className="flex flex-col p-2 bg-slate-50 dark:bg-slate-700/30 rounded border border-slate-100 dark:border-slate-600/50 group/item">
-                             {editingAliasId === u.id ? (
-                               <form onSubmit={(e) => { 
-                                 e.preventDefault(); 
-                                 if(!aliasInput.trim()) {
-                                    const newA = {...userAliases}; delete newA[u.id]; setUserAliases(newA);
-                                 } else {
-                                    setUserAliases({...userAliases, [u.id]: aliasInput.trim()});
-                                 }
-                                 setEditingAliasId(null); 
-                               }} className="flex items-center mb-1">
-                                 <input autoFocus type="text" value={aliasInput} onChange={e => setAliasInput(e.target.value)} onBlur={() => {
-                                     if(!aliasInput.trim()) {
-                                        const newA = {...userAliases}; delete newA[u.id]; setUserAliases(newA);
-                                     } else {
-                                        setUserAliases({...userAliases, [u.id]: aliasInput.trim()});
-                                     }
-                                     setEditingAliasId(null);
-                                 }} className="w-full text-xs px-1.5 py-0.5 border border-slate-300 rounded focus:outline-none dark:bg-slate-800 dark:text-white dark:border-slate-600" />
-                               </form>
-                             ) : (
-                               <div className="flex justify-between items-center mb-1">
-                                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{userAliases[u.id] || u.name}</span>
-                                 <button onClick={(e) => { e.stopPropagation(); setEditingAliasId(u.id); setAliasInput(userAliases[u.id] || u.name); }} className="text-slate-400 hover:text-blueJeans dark:hover:text-goldenYellow opacity-0 group-hover/item:opacity-100 transition-opacity"><Edit2 size={12}/></button>
-                               </div>
-                             )}
+                          <div key={u.id} className="flex flex-col p-2 bg-slate-50 dark:bg-slate-700/30 rounded border border-slate-100 dark:border-slate-600/50">
+                             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{u.name}</span>
                              <span className="text-[10px] text-slate-500 font-medium">Tab: <span className="uppercase text-slate-700 dark:text-slate-300">{u.tab}</span></span>
                              {u.field && <span className="text-[10px] text-slate-500 font-medium text-tangerine truncate">Editing: {u.field}</span>}
                           </div>
@@ -1843,7 +1841,7 @@ export default function App() {
                 {/* LIVE PRESENCE INDICATORS PER TAB */}
                 <div className="flex -space-x-1 ml-1.5">
                    {onlineUsers.filter(u => u.tab === tab.id).map((u, idx) => {
-                      const displayN = userAliases[u.id] || u.name;
+                      const displayN = u.name;
                       return (
                       <div key={idx} className="h-5 w-5 rounded-full bg-tangerine text-[9px] font-bold text-white flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm" title={`${displayN} is currently editing ${u.field ? `'${u.field}'` : 'this tab'}`}>
                          {displayN.charAt(0).toUpperCase()}
