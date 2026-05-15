@@ -1,6 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Calculator, DollarSign, Building2, LineChart, FileText, PieChart, Receipt, FileSpreadsheet, ToggleLeft, ToggleRight, CheckSquare, Square, Users, Moon, Sun, Lock, Save, Upload, Package, TrendingUp, Archive, BookOpen, PanelRightClose, ArrowRightCircle } from 'lucide-react';
+import { Plus, Trash2, Calculator, DollarSign, Building2, LineChart, FileText, PieChart, Receipt, FileSpreadsheet, ToggleLeft, ToggleRight, CheckSquare, Square, Users, Moon, Sun, Lock, Save, Upload, Package, TrendingUp, Archive, BookOpen, PanelRightClose, ArrowRightCircle, MessageSquare, Send } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, LineChart as RechartsLineChart, Line, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
+
+// --- FIREBASE IMPORTS ---
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, deleteDoc } from 'firebase/firestore';
+
+// --- FIREBASE INITIALIZATION ---
+let app, auth, db, appId;
+try {
+  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+} catch (e) {
+  console.error("Firebase init error", e);
+}
 
 // --- CONSTANTS & CONFIG ---
 const CURRENCIES = [
@@ -242,6 +259,15 @@ export default function XeiaFinance() {
   const [loginError, setLoginError] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // --- COLLABORATION & FIREBASE STATES ---
+  const [user, setUser] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const isApplyingRemote = useRef(false);
+  const deviceId = useRef(Math.random().toString(36).substr(2, 9)); // Distinguish same account on diff tabs
+
   // --- STATE MANAGEMENT ---
   const [companyName, setCompanyName] = useState('XEIA CORPORATION');
   const [dbaName, setDbaName] = useState('Doing business under the name and style of Xeia');
@@ -406,6 +432,159 @@ export default function XeiaFinance() {
   });
   const [deprSchedule, setDeprSchedule] = useState([]);
 
+  // --- FIREBASE SYNC & COLLABORATION EFFECTS ---
+
+  // Auth Initialization
+  useEffect(() => {
+    if (!auth) return;
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth error", err);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  // Presence & Chat Listeners
+  useEffect(() => {
+    if (!user || !isAuthenticated || !db) return;
+
+    const myPresenceId = `${user.uid}_${deviceId.current}`;
+    const presenceRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence', myPresenceId);
+    
+    setDoc(presenceRef, { name: loginName, tab: activeTab, timestamp: Date.now() }).catch(console.error);
+
+    const handleUnload = () => deleteDoc(presenceRef);
+    window.addEventListener('beforeunload', handleUnload);
+
+    // Listen to Other Users' Presence
+    const presenceCol = collection(db, 'artifacts', appId, 'public', 'data', 'presence');
+    const unsubPresence = onSnapshot(presenceCol, (snapshot) => {
+      const users = [];
+      snapshot.forEach(doc => {
+        if (doc.id !== myPresenceId) { 
+          const data = doc.data();
+          if (Date.now() - data.timestamp < 7200000) users.push({ id: doc.id, ...data });
+        }
+      });
+      setOnlineUsers(users);
+    }, console.error);
+
+    // Listen to Global Chat
+    const chatCol = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
+    const unsubChat = onSnapshot(chatCol, (snapshot) => {
+      const msgs = [];
+      snapshot.forEach(d => msgs.push({ id: d.id, ...d.data() }));
+      msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)); // Sort chronologically locally
+      setChatMessages(msgs);
+    }, console.error);
+
+    return () => {
+      unsubPresence();
+      unsubChat();
+      window.removeEventListener('beforeunload', handleUnload);
+    };
+  }, [user, isAuthenticated, activeTab, loginName]);
+
+  // Pull State Updates from Firebase
+  useEffect(() => {
+    if (!user || !isAuthenticated || !db) return;
+    const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appState', 'main');
+    
+    const unsubState = onSnapshot(stateRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.lastEditor === `${user.uid}_${deviceId.current}`) return; // Ignore our own device updates
+
+        isApplyingRemote.current = true; // Block local sync logic temporarily
+        const s = data.state;
+        
+        if (s.companyName !== undefined) setCompanyName(s.companyName);
+        if (s.dbaName !== undefined) setDbaName(s.dbaName);
+        if (s.isConsolidated !== undefined) setIsConsolidated(s.isConsolidated);
+        if (s.isTwoYear !== undefined) setIsTwoYear(s.isTwoYear);
+        if (s.currency !== undefined) setCurrency(s.currency);
+        if (s.year1 !== undefined) setYear1(s.year1);
+        if (s.year2 !== undefined) setYear2(s.year2);
+        if (s.splData) setSplData(s.splData);
+        if (s.sceData) setSceData(s.sceData);
+        if (s.bsData) setBsData(s.bsData);
+        if (s.cfData) setCfData(s.cfData);
+        if (s.ratioData) setRatioData(s.ratioData);
+        if (s.taxLedger) setTaxLedger(s.taxLedger);
+        if (s.incomeTaxTable) setIncomeTaxTable(s.incomeTaxTable);
+        if (s.flatTaxRates) setFlatTaxRates(s.flatTaxRates);
+        if (s.payrollConfig) setPayrollConfig(s.payrollConfig);
+        if (s.payrollCols) setPayrollCols(s.payrollCols);
+        if (s.employees) setEmployees(s.employees);
+        if (s.costingData) setCostingData(s.costingData);
+        if (s.forecastPeriods) setForecastPeriods(s.forecastPeriods);
+        if (s.forecastItems) setForecastItems(s.forecastItems);
+        if (s.deprState) setDeprState(s.deprState);
+        if (s.deprSchedule) setDeprSchedule(s.deprSchedule);
+        if (s.notesText !== undefined) setNotesText(s.notesText);
+
+        setTimeout(() => { isApplyingRemote.current = false; }, 500); // Unblock local sync after rendering
+      }
+    }, console.error);
+
+    return () => unsubState();
+  }, [user, isAuthenticated]);
+
+  // Push Local State to Firebase (Debounced)
+  useEffect(() => {
+    if (!user || !isAuthenticated || !db || isApplyingRemote.current) return;
+    
+    const timer = setTimeout(() => {
+      if (isApplyingRemote.current) return; // Safety check
+      const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appState', 'main');
+      
+      setDoc(stateRef, {
+        state: {
+          companyName, dbaName, isConsolidated, isTwoYear, currency, year1, year2,
+          splData, sceData, bsData, cfData, ratioData,
+          taxLedger, incomeTaxTable, flatTaxRates,
+          payrollConfig, payrollCols, employees,
+          costingData, forecastPeriods, forecastItems, deprState, deprSchedule, notesText
+        },
+        lastEditor: `${user.uid}_${deviceId.current}`,
+        editorName: loginName,
+        timestamp: Date.now()
+      }).catch(console.error);
+    }, 1500); // Debounce to allow continuous typing
+
+    return () => clearTimeout(timer);
+  }, [
+    companyName, dbaName, isConsolidated, isTwoYear, currency, year1, year2,
+    splData, sceData, bsData, cfData, ratioData, taxLedger, incomeTaxTable, flatTaxRates,
+    payrollConfig, payrollCols, employees, costingData, forecastPeriods, forecastItems, deprState, deprSchedule, notesText,
+    user, isAuthenticated, loginName
+  ]);
+
+  // --- CHAT LOGIC ---
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !user || !db) return;
+    try {
+      const chatCol = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
+      await addDoc(chatCol, {
+        text: chatInput,
+        sender: loginName,
+        timestamp: Date.now()
+      });
+      setChatInput('');
+    } catch (err) {
+      console.error("Chat error", err);
+    }
+  };
 
   // --- LOGIN LOGIC ---
   const handleLogin = (e) => {
@@ -427,7 +606,6 @@ export default function XeiaFinance() {
       splData, sceData, bsData, cfData, ratioData, 
       taxLedger, incomeTaxTable, flatTaxRates,
       payrollConfig, payrollCols, employees,
-      // NEW FEATURES
       costingData, forecastPeriods, forecastItems, deprState, deprSchedule, notesText
     };
     
@@ -471,7 +649,6 @@ export default function XeiaFinance() {
         if(data.payrollCols) setPayrollCols(data.payrollCols);
         if(data.employees) setEmployees(data.employees);
 
-        // NEW FEATURES
         if(data.costingData) setCostingData(data.costingData);
         if(data.forecastPeriods) setForecastPeriods(data.forecastPeriods);
         if(data.forecastItems) setForecastItems(data.forecastItems);
@@ -1361,8 +1538,42 @@ export default function XeiaFinance() {
     <div className={`${isDarkMode ? 'dark' : ''}`}>
       <div className={`min-h-screen font-sans pb-20 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 relative`}>
 
+        {/* --- LIVE CHAT WIDGET --- */}
+        {isAuthenticated && (
+          <div className={`fixed bottom-4 left-4 z-50 flex flex-col ${isChatOpen ? 'w-80 h-96' : 'w-auto h-auto'}`}>
+             {isChatOpen ? (
+                <div className="flex-1 bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 rounded-xl flex flex-col overflow-hidden">
+                   <div className="bg-blueVelvet text-white p-3 flex justify-between items-center cursor-pointer hover:bg-blue-900 transition-colors" onClick={() => setIsChatOpen(false)}>
+                      <span className="font-bold text-sm flex items-center gap-2"><MessageSquare size={16}/> Team Chat</span>
+                      <PanelRightClose size={16} />
+                   </div>
+                   <div className="flex-1 p-3 overflow-y-auto bg-slate-50 dark:bg-slate-900 flex flex-col gap-3">
+                      {chatMessages.map(msg => (
+                         <div key={msg.id} className={`max-w-[85%] rounded-lg p-2 text-sm shadow-sm ${msg.sender === loginName ? 'bg-blueJeans text-white self-end rounded-br-none' : 'bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 self-start rounded-bl-none'}`}>
+                            <div className="text-[10px] opacity-70 mb-0.5 font-bold flex justify-between items-center">
+                              <span>{msg.sender}</span>
+                            </div>
+                            <div className="leading-snug">{msg.text}</div>
+                         </div>
+                      ))}
+                      {chatMessages.length === 0 && <div className="text-center text-xs text-slate-400 mt-10">No messages yet. Start the conversation!</div>}
+                   </div>
+                   <form onSubmit={handleSendMessage} className="p-2 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex gap-2">
+                      <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} className="flex-1 bg-slate-100 dark:bg-slate-700 rounded px-3 py-1.5 text-sm focus:outline-none dark:text-white" placeholder="Type a message..."/>
+                      <button type="submit" disabled={!chatInput.trim()} className="bg-tangerine disabled:opacity-50 text-white p-1.5 rounded hover:opacity-90 transition-opacity"><Send size={16}/></button>
+                   </form>
+                </div>
+             ) : (
+                <button onClick={() => setIsChatOpen(true)} className="bg-blueVelvet hover:bg-blue-900 text-white p-3 rounded-full shadow-xl flex items-center gap-2 transition-transform hover:scale-105 relative">
+                   <MessageSquare size={24} />
+                   {chatMessages.length > 0 && <span className="absolute -top-1 -right-1 h-3.5 w-3.5 bg-tangerine rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></span>}
+                </button>
+             )}
+          </div>
+        )}
+
         {/* --- FLOATING COLLAPSIBLE NOTES PANEL --- */}
-        <div className={`fixed top-24 right-0 h-[70vh] bg-white dark:bg-slate-800 shadow-[0_0_15px_rgba(0,0,0,0.1)] border-l border-y border-slate-200 dark:border-slate-700 transition-transform duration-300 z-50 rounded-l-xl flex flex-col ${isNotesOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: '320px' }}>
+        <div className={`fixed top-24 right-0 h-[70vh] bg-white dark:bg-slate-800 shadow-[0_0_15px_rgba(0,0,0,0.1)] border-l border-y border-slate-200 dark:border-slate-700 transition-transform duration-300 z-40 rounded-l-xl flex flex-col ${isNotesOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: '320px' }}>
           <div className="flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-tl-xl">
              <span className="font-bold text-sm flex items-center gap-2 text-blueVelvet dark:text-goldenYellow"><BookOpen size={16}/> Adjustments & Notes</span>
              <button onClick={() => setIsNotesOpen(false)} className="text-slate-500 hover:text-red-500 transition-colors"><PanelRightClose size={18}/></button>
@@ -1371,7 +1582,7 @@ export default function XeiaFinance() {
              value={notesText}
              onChange={e => setNotesText(e.target.value)}
              className="w-full flex-1 p-4 resize-none bg-transparent focus:outline-none text-sm dark:text-slate-200"
-             placeholder="Jot down assumptions, goal changes, or target figures here. This data saves with your backup file."
+             placeholder="Jot down assumptions, goal changes, or target figures here. This data saves with your backup file and syncs with your team."
           ></textarea>
         </div>
 
@@ -1384,7 +1595,7 @@ export default function XeiaFinance() {
         {/* ------------------------------------------ */}
         
         {/* Top Header */}
-        <header className={`bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10`}>
+        <header className={`bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between overflow-x-auto">
             <div className="flex items-center gap-3 mr-4">
               <img src="/logo-1.png" alt="Xeia Finance Logo" className="h-10 w-auto object-contain shrink-0" />
@@ -1395,6 +1606,12 @@ export default function XeiaFinance() {
             </div>
             
             <div className="flex items-center gap-3 shrink-0">
+              {/* LIVE PRESENCE INDICATOR (HEADER) */}
+              <div className="flex items-center gap-1.5 mr-2 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 px-3 py-1 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300 shadow-sm">
+                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                 {onlineUsers.length + 1} Online
+              </div>
+
               <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Toggle Dark Mode">
                 {isDarkMode ? <Sun size={18} className={`text-goldenYellow`} /> : <Moon size={18} className={`text-blueVelvet`} />}
               </button>
@@ -1451,19 +1668,27 @@ export default function XeiaFinance() {
             ].map((tab) => (
               <button
                 key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg font-medium transition-colors text-sm whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg font-medium transition-colors text-sm whitespace-nowrap relative ${
                   activeTab === tab.id 
-                    ? `bg-white dark:bg-slate-800 text-tangerine border-t-[3px] border-t-tangerine border-l border-r border-slate-200 dark:border-slate-700 shadow-[0_4px_0_0_white] dark:shadow-[0_4px_0_0_#1e293b] -mb-[1px]` 
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? `bg-white dark:bg-slate-800 text-tangerine border-t-[3px] border-t-tangerine border-l border-r border-slate-200 dark:border-slate-700 shadow-[0_4px_0_0_white] dark:shadow-[0_4px_0_0_#1e293b] -mb-[1px] z-10` 
+                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border-t-[3px] border-transparent'
                 }`}
               >
                 <tab.icon size={16} /> {tab.label}
+                {/* LIVE PRESENCE INDICATORS PER TAB */}
+                <div className="flex -space-x-1 ml-1.5">
+                   {onlineUsers.filter(u => u.tab === tab.id).map((u, idx) => (
+                      <div key={idx} className="h-5 w-5 rounded-full bg-tangerine text-[9px] font-bold text-white flex items-center justify-center border-2 border-white dark:border-slate-800 shadow-sm" title={`${u.name} is currently editing this tab`}>
+                         {u.name.charAt(0).toUpperCase()}
+                      </div>
+                   ))}
+                </div>
               </button>
             ))}
           </div>
 
           {/* --- MAIN CONTENT AREA --- */}
-          <div className={`bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 p-8 rounded-b-lg rounded-tr-lg min-h-[800px]`}>
+          <div className={`bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 p-8 rounded-b-lg rounded-tr-lg min-h-[800px] relative z-0`}>
             
             {/* General Document Header */}
             {(activeTab !== 'tax' && activeTab !== 'payroll' && activeTab !== 'costing' && activeTab !== 'forecast' && activeTab !== 'depreciation') && (
