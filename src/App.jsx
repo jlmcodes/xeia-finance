@@ -518,29 +518,45 @@ export default function App() {
   useEffect(() => {
     if (!user || !isAuthenticated || !db) return;
 
+    const workspaceId = loginName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     const myPresenceId = `${user.uid}_${deviceId.current}`;
-    const presenceRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence', myPresenceId);
+    const presenceRef = doc(db, 'artifacts', appId, 'public', 'data', `presence_${workspaceId}`, myPresenceId);
     
-    setDoc(presenceRef, { name: loginName, tab: activeTab, field: activeField, timestamp: Date.now() }).catch(console.error);
+    const updatePresence = () => {
+      setDoc(presenceRef, { name: loginName, tab: activeTab, field: activeField, timestamp: Date.now() }).catch(console.error);
+    };
+
+    updatePresence();
+    const presenceInterval = setInterval(updatePresence, 15000); // 15-second heartbeat
 
     const handleUnload = () => deleteDoc(presenceRef);
     window.addEventListener('beforeunload', handleUnload);
 
     // Listen to Other Users' Presence
-    const presenceCol = collection(db, 'artifacts', appId, 'public', 'data', 'presence');
+    const presenceCol = collection(db, 'artifacts', appId, 'public', 'data', `presence_${workspaceId}`);
     const unsubPresence = onSnapshot(presenceCol, (snapshot) => {
       const users = [];
-      snapshot.forEach(doc => {
-        if (doc.id !== myPresenceId) { 
-          const data = doc.data();
-          if (Date.now() - data.timestamp < 7200000) users.push({ id: doc.id, ...data });
+      const now = Date.now();
+      snapshot.forEach(docSnap => {
+        if (docSnap.id !== myPresenceId) { 
+          const data = docSnap.data();
+          if (now - data.timestamp < 45000) { // Keep if heartbeat is within 45s
+            users.push({ id: docSnap.id, ...data });
+          } else {
+            deleteDoc(docSnap.ref).catch(() => {}); // Auto-clean ghost profiles
+          }
         }
       });
       setOnlineUsers(users);
     }, console.error);
 
+    // Local presence cleanup interval 
+    const cleanupInterval = setInterval(() => {
+       setOnlineUsers(prev => prev.filter(u => Date.now() - u.timestamp < 45000));
+    }, 15000);
+
     // Listen to Global Chat
-    const chatCol = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
+    const chatCol = collection(db, 'artifacts', appId, 'public', 'data', `chat_${workspaceId}`);
     const unsubChat = onSnapshot(chatCol, (snapshot) => {
       const msgs = [];
       snapshot.forEach(d => msgs.push({ id: d.id, ...d.data() }));
@@ -549,8 +565,11 @@ export default function App() {
     }, console.error);
 
     return () => {
+      clearInterval(presenceInterval);
+      clearInterval(cleanupInterval);
       unsubPresence();
       unsubChat();
+      deleteDoc(presenceRef).catch(() => {});
       window.removeEventListener('beforeunload', handleUnload);
     };
   }, [user, isAuthenticated, activeTab, activeField, loginName]);
@@ -558,7 +577,8 @@ export default function App() {
   // Pull State Updates from Firebase
   useEffect(() => {
     if (!user || !isAuthenticated || !db) return;
-    const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appState', 'main');
+    const workspaceId = loginName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appStates', workspaceId);
     
     const unsubState = onSnapshot(stateRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -598,7 +618,7 @@ export default function App() {
     }, console.error);
 
     return () => unsubState();
-  }, [user, isAuthenticated]);
+  }, [user, isAuthenticated, loginName]);
 
   // Push Local State to Firebase (Debounced)
   useEffect(() => {
@@ -606,7 +626,8 @@ export default function App() {
     
     const timer = setTimeout(() => {
       if (isApplyingRemote.current) return; // Safety check
-      const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appState', 'main');
+      const workspaceId = loginName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appStates', workspaceId);
       
       setDoc(stateRef, {
         state: {
@@ -635,7 +656,8 @@ export default function App() {
     e.preventDefault();
     if (!chatInput.trim() || !user || !db) return;
     try {
-      const chatCol = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
+      const workspaceId = loginName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      const chatCol = collection(db, 'artifacts', appId, 'public', 'data', `chat_${workspaceId}`);
       await addDoc(chatCol, {
         text: chatInput,
         sender: loginName,
