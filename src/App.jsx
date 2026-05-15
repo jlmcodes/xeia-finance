@@ -10,7 +10,7 @@ import { getFirestore, doc, setDoc, onSnapshot, collection, addDoc, deleteDoc } 
 // --- FIREBASE INITIALIZATION ---
 let app, auth, db, appId;
 try {
-  const firebaseConfig = {
+  const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
     apiKey: "AIzaSyDsRJfZ_dROleDsVW_w0K9EVzJSbDugemE",
     authDomain: "xeia-finance.firebaseapp.com",
     projectId: "xeia-finance",
@@ -23,7 +23,7 @@ try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
-  appId = "xeia-finance-app"; 
+  appId = typeof __app_id !== 'undefined' ? __app_id : "xeia-finance-app"; 
 } catch (e) {
   console.error("Firebase init error", e);
 }
@@ -261,7 +261,7 @@ const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isD
   );
 };
 
-export default function XeiaFinance() {
+export default function App() {
   // --- AUTHENTICATION & THEME STATE ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginName, setLoginName] = useState('');
@@ -479,7 +479,12 @@ export default function XeiaFinance() {
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
+          try {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } catch (tokenErr) {
+            console.error("Custom token error, falling back to anonymous", tokenErr);
+            await signInAnonymously(auth);
+          }
         } else {
           await signInAnonymously(auth);
         }
