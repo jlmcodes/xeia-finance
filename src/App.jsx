@@ -4,7 +4,7 @@ import {
   PieChart, Receipt, FileSpreadsheet, ToggleLeft, ToggleRight, CheckSquare, 
   Square, Users, Moon, Sun, Lock, Save, Upload, Package, TrendingUp, 
   Archive, BookOpen, PanelRightClose, ArrowRightCircle, MessageSquare, 
-  Send, Edit2, CalendarDays, ArrowUp, ArrowDown 
+  Send, Edit2, CalendarDays, ArrowUp, ArrowDown, RotateCcw
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -936,6 +936,68 @@ export default function App() {
     e.target.value = null; 
   };
 
+  // --- CLEAR DATA LOGIC ---
+  const handleClearData = () => {
+    if (window.confirm("Are you sure you want to clear all data? This will reset all financial amounts and remove custom line items, employees, taxes, and records. Make sure you have a backup saved!")) {
+      setSplData({
+        revenues: [{ id: 1, name: 'Sales Revenue', amounts: {} }, { id: 2, name: 'Service Revenue', amounts: {} }],
+        cogs: [{ id: 1, name: 'Cost of Goods Sold', amounts: {} }],
+        expenses: [{ id: 1, name: 'Salaries Expense', amounts: {} }, { id: 2, name: 'Rent Expense', amounts: {} }],
+        oci: []
+      });
+      setSceData({
+        beginningCapital: {},
+        investments: [],
+        dividends: []
+      });
+      setBsData({
+        currentAssets: [
+          { id: 1, name: 'Short-term investments', amounts: {} },
+          { id: 2, name: 'Receivables and contract assets', amounts: {} },
+          { id: 3, name: 'Inventories', amounts: {} }
+        ],
+        nonCurrentAssets: [
+          { id: 1, name: 'Property, plant and equipment', amounts: {} },
+          { id: 2, name: 'Right-of-use assets', amounts: {} }
+        ],
+        currentLiabilities: [
+          { id: 1, name: 'Trade payables and contract liabilities', amounts: {} },
+          { id: 2, name: 'Short-term debt', amounts: {} }
+        ],
+        nonCurrentLiabilities: [
+          { id: 1, name: 'Senior debt securities', amounts: {} },
+          { id: 2, name: 'Lease liabilities', amounts: {} }
+        ],
+      });
+      setCfData({
+        beginningCash: {},
+        operating: [],
+        investing: [],
+        financing: []
+      });
+      setRatioData({ initialInvestment: {} });
+      setTaxLedger([]);
+      setTaxBasisInput(0);
+      setVatSales(0);
+      setVatPurchases(0);
+      setEmployees([]);
+      setSavedProducts([]);
+      setCostingData({
+        productId: `PROD-${Date.now().toString().slice(-5)}`, 
+        productName: 'New Product', 
+        productDescription: '',
+        materials: [],
+        labor: [],
+        overhead: []
+      });
+      setForecastItems([]);
+      setDeprState({ assetName: '', cost: 0, salvage: 0, life: 5, method: 'Straight Line' });
+      setDeprSchedule([]);
+      setNotesText('');
+      alert("All placeholder data has been cleared! You have a clean sheet.");
+    }
+  };
+
   // --- PERIOD MANAGEMENT LOGIC ---
   const handleAddPeriod = () => {
     if (!newPeriodInput.trim() || periods.includes(newPeriodInput.trim())) {
@@ -1438,7 +1500,7 @@ export default function App() {
       writeStyledTotal(splSheet, compIncRow, 'COMPREHENSIVE INCOME', compFormulas, true);
 
       // SCE Sheet
-      const sceSheet = setupSheet('Changes in Equity', 'STATEMENT OF CHANGES IN EQUITY');
+      const sceSheet = setupSheet('Changes in Equity', 'STATEMENT OF Changes in Equity');
       sceSheet.getCell('A8').value = 'Beginning Capital Balance';
       periods.forEach((p, i) => { 
         sceSheet.getCell(8, i+2).value = Number(financials[p]?.begCap) || 0; 
@@ -1848,6 +1910,14 @@ export default function App() {
               <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
               
               <div className="flex gap-2 relative">
+                 <button 
+                   onClick={handleClearData} 
+                   className={`flex items-center gap-1.5 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60 px-3 py-1.5 rounded-md border border-red-200 dark:border-red-800/50 font-bold text-sm transition-all`}
+                   title="Clear All Data"
+                 >
+                    <RotateCcw size={16} /> Clear 
+                 </button>
+                 <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1 self-center"></div>
                  <button 
                    onClick={handleSaveSession} 
                    className={`flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700 text-blueVelvet dark:text-slate-200 hover:bg-slate-200 px-3 py-1.5 rounded-md border border-slate-300 font-medium text-sm transition-all`}
@@ -2758,18 +2828,6 @@ export default function App() {
                                           className="w-full font-mono text-right outline-none bg-transparent"
                                         />
                                       </div>
-                                    </td>
-                                    <td className="px-3 py-1">
-                                      <input 
-                                        type="number" 
-                                        value={row.baseTax ?? 0} 
-                                        onChange={(e) => {
-                                            const newTable = [...incomeTaxTable];
-                                            newTable[idx].baseTax = Number(e.target.value);
-                                            setIncomeTaxTable(newTable);
-                                        }} 
-                                        className="w-full text-right bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 focus:outline-blue-500 font-mono"
-                                      />
                                     </td>
                                     <td className="px-3 py-1">
                                       <input 
