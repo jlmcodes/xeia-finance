@@ -340,7 +340,9 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  
   const isApplyingRemote = useRef(false);
+  const hasLoadedInitialData = useRef(false); // Fixes the overwrite bug upon join
   const deviceId = useRef(Math.random().toString(36).substr(2, 9)); 
   const [activeField, setActiveField] = useState(null); 
 
@@ -663,6 +665,7 @@ export default function App() {
     };
   }, [user, isAuthenticated, activeTab, activeField, loginName, displayName]);
 
+  // Listener to read incoming states
   useEffect(() => {
     if (!user || !isAuthenticated || !db) return;
     
@@ -670,6 +673,8 @@ export default function App() {
     const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appStates', workspaceId);
     
     const unsubState = onSnapshot(stateRef, (docSnap) => {
+      hasLoadedInitialData.current = true; // Mark that initial load is verified
+      
       if (docSnap.exists()) {
         const data = docSnap.data();
         if (data.lastEditor === `${user.uid}_${deviceId.current}`) return;
@@ -738,6 +743,10 @@ export default function App() {
         if (s.taxLedger) setTaxLedger(s.taxLedger);
         if (s.incomeTaxTable) setIncomeTaxTable(s.incomeTaxTable);
         if (s.flatTaxRates) setFlatTaxRates(s.flatTaxRates);
+        if (s.vatSales !== undefined) setVatSales(s.vatSales);
+        if (s.vatPurchases !== undefined) setVatPurchases(s.vatPurchases);
+        if (s.taxBasisInput !== undefined) setTaxBasisInput(s.taxBasisInput);
+        if (s.selectedFlatTax !== undefined) setSelectedFlatTax(s.selectedFlatTax);
         if (s.payrollConfig) setPayrollConfig(s.payrollConfig);
         if (s.payrollCols) setPayrollCols(s.payrollCols);
         if (s.employees) setEmployees(s.employees);
@@ -756,8 +765,10 @@ export default function App() {
     return () => unsubState();
   }, [user, isAuthenticated, loginName]);
 
+  // Save states to Firebase
   useEffect(() => {
-    if (!user || !isAuthenticated || !db || isApplyingRemote.current) return;
+    // Guards against writing before the initial snapshot load completes
+    if (!user || !isAuthenticated || !db || isApplyingRemote.current || !hasLoadedInitialData.current) return;
     
     const timer = setTimeout(() => {
       if (isApplyingRemote.current) return; 
@@ -768,6 +779,7 @@ export default function App() {
         state: {
           companyName, dbaName, isConsolidated, isComparisonMode, currency, periods, activePeriod, comparePeriod,
           splData, sceData, bsData, cfData, ratioData, taxLedger, incomeTaxTable, flatTaxRates,
+          vatSales, vatPurchases, taxBasisInput, selectedFlatTax,
           payrollConfig, payrollCols, employees, costingData, savedProducts, forecastPeriods, forecastItems, deprState, deprSchedule, notesText
         },
         lastEditor: `${user.uid}_${deviceId.current}`,
@@ -780,6 +792,7 @@ export default function App() {
   }, [
     companyName, dbaName, isConsolidated, isComparisonMode, currency, periods, activePeriod, comparePeriod,
     splData, sceData, bsData, cfData, ratioData, taxLedger, incomeTaxTable, flatTaxRates,
+    vatSales, vatPurchases, taxBasisInput, selectedFlatTax,
     payrollConfig, payrollCols, employees, costingData, savedProducts, forecastPeriods, forecastItems, deprState, deprSchedule, notesText,
     user, isAuthenticated, loginName
   ]);
@@ -837,6 +850,7 @@ export default function App() {
       timestamp: new Date().toISOString(),
       companyName, dbaName, isConsolidated, isComparisonMode, currency, periods, activePeriod, comparePeriod,
       splData, sceData, bsData, cfData, ratioData, taxLedger, incomeTaxTable, flatTaxRates,
+      vatSales, vatPurchases, taxBasisInput, selectedFlatTax,
       payrollConfig, payrollCols, employees, costingData, savedProducts, forecastPeriods, forecastItems, deprState, deprSchedule, notesText
     };
     const blob = new Blob([JSON.stringify(sessionData, null, 2)], { type: "application/json" });
@@ -856,78 +870,93 @@ export default function App() {
       try {
         const data = JSON.parse(event.target.result);
         const s = data;
+        
+        // Migration mapper
         const mapAmounts = (arr) => {
            if (!arr) return [];
            return arr.map(item => {
               if (item.amounts) return item;
-              return { 
-                 ...item, 
-                 amounts: { 
-                    [s.year1 || '2024']: item.amount1 || 0, 
-                    [s.year2 || '2023']: item.amount2 || 0 
-                 } 
-              };
+              return { ...item, amounts: { [s.year1 || '2024']: item.amount1 || 0, [s.year2 || '2023']: item.amount2 || 0 } };
            });
         };
         
-        if (s.periods) setPeriods(s.periods); 
-        else if (s.year1 && s.year2) setPeriods([s.year2, s.year1]);
+        const mappedState = {
+          companyName: s.companyName !== undefined ? s.companyName : companyName,
+          dbaName: s.dbaName !== undefined ? s.dbaName : dbaName,
+          isConsolidated: s.isConsolidated !== undefined ? s.isConsolidated : isConsolidated,
+          isComparisonMode: s.isComparisonMode !== undefined ? s.isComparisonMode : isComparisonMode,
+          currency: s.currency !== undefined ? s.currency : currency,
+          periods: s.periods || (s.year1 && s.year2 ? [s.year2, s.year1] : periods),
+          activePeriod: s.activePeriod || s.year1 || activePeriod,
+          comparePeriod: s.comparePeriod || s.year2 || comparePeriod,
+          splData: s.splData ? { revenues: mapAmounts(s.splData.revenues), cogs: mapAmounts(s.splData.cogs), expenses: mapAmounts(s.splData.expenses), oci: mapAmounts(s.splData.oci) } : splData,
+          sceData: s.sceData ? { beginningCapital: s.sceData.beginningCapital || { [s.year1||'2024']: s.sceData.beginningCapital1, [s.year2||'2023']: s.sceData.beginningCapital2 }, investments: mapAmounts(s.sceData.investments), dividends: mapAmounts(s.sceData.dividends) } : sceData,
+          bsData: s.bsData ? { currentAssets: mapAmounts(s.bsData.currentAssets), nonCurrentAssets: mapAmounts(s.bsData.nonCurrentAssets), currentLiabilities: mapAmounts(s.bsData.currentLiabilities), nonCurrentLiabilities: mapAmounts(s.bsData.nonCurrentLiabilities) } : bsData,
+          cfData: s.cfData ? { beginningCash: s.cfData.beginningCash || { [s.year1||'2024']: s.cfData.beginningCash1, [s.year2||'2023']: s.cfData.beginningCash2 }, operating: mapAmounts(s.cfData.operating), investing: mapAmounts(s.cfData.investing), financing: mapAmounts(s.cfData.financing) } : cfData,
+          ratioData: s.ratioData ? { initialInvestment: s.ratioData.initialInvestment || { [s.year1||'2024']: s.ratioData.initialInvestment1, [s.year2||'2023']: s.ratioData.initialInvestment2 } } : ratioData,
+          taxLedger: s.taxLedger || taxLedger,
+          incomeTaxTable: s.incomeTaxTable || incomeTaxTable,
+          flatTaxRates: s.flatTaxRates || flatTaxRates,
+          vatSales: s.vatSales !== undefined ? s.vatSales : vatSales,
+          vatPurchases: s.vatPurchases !== undefined ? s.vatPurchases : vatPurchases,
+          taxBasisInput: s.taxBasisInput !== undefined ? s.taxBasisInput : taxBasisInput,
+          selectedFlatTax: s.selectedFlatTax !== undefined ? s.selectedFlatTax : selectedFlatTax,
+          payrollConfig: s.payrollConfig || payrollConfig,
+          payrollCols: s.payrollCols || payrollCols,
+          employees: s.employees || employees,
+          costingData: s.costingData || costingData,
+          savedProducts: s.savedProducts || savedProducts,
+          forecastPeriods: s.forecastPeriods || forecastPeriods,
+          forecastItems: s.forecastItems || forecastItems,
+          deprState: s.deprState || deprState,
+          deprSchedule: s.deprSchedule || deprSchedule,
+          notesText: s.notesText !== undefined ? s.notesText : notesText
+        };
         
-        if (s.activePeriod) setActivePeriod(s.activePeriod); else if (s.year1) setActivePeriod(s.year1);
-        if (s.comparePeriod) setComparePeriod(s.comparePeriod); else if (s.year2) setComparePeriod(s.year2);
-        if (s.isComparisonMode !== undefined) setIsComparisonMode(s.isComparisonMode); else if (s.isTwoYear !== undefined) setIsComparisonMode(s.isTwoYear);
+        setPeriods(mappedState.periods);
+        setActivePeriod(mappedState.activePeriod);
+        setComparePeriod(mappedState.comparePeriod);
+        setIsComparisonMode(mappedState.isComparisonMode);
+        setCompanyName(mappedState.companyName);
+        setDbaName(mappedState.dbaName);
+        setIsConsolidated(mappedState.isConsolidated);
+        setCurrency(mappedState.currency);
+        setSplData(mappedState.splData);
+        setSceData(mappedState.sceData);
+        setBsData(mappedState.bsData);
+        setCfData(mappedState.cfData);
+        setRatioData(mappedState.ratioData);
+        setTaxLedger(mappedState.taxLedger);
+        setIncomeTaxTable(mappedState.incomeTaxTable);
+        setFlatTaxRates(mappedState.flatTaxRates);
+        setVatSales(mappedState.vatSales);
+        setVatPurchases(mappedState.vatPurchases);
+        setTaxBasisInput(mappedState.taxBasisInput);
+        setSelectedFlatTax(mappedState.selectedFlatTax);
+        setPayrollConfig(mappedState.payrollConfig);
+        setPayrollCols(mappedState.payrollCols);
+        setEmployees(mappedState.employees);
+        setCostingData(mappedState.costingData);
+        setSavedProducts(mappedState.savedProducts);
+        setForecastPeriods(mappedState.forecastPeriods);
+        setForecastItems(mappedState.forecastItems);
+        setDeprState(mappedState.deprState);
+        setDeprSchedule(mappedState.deprSchedule);
+        setNotesText(mappedState.notesText);
         
-        if(s.companyName !== undefined) setCompanyName(s.companyName);
-        if(s.dbaName !== undefined) setDbaName(s.dbaName);
-        if(s.isConsolidated !== undefined) setIsConsolidated(s.isConsolidated);
-        if(s.currency !== undefined) setCurrency(s.currency);
-        
-        if (s.splData) setSplData({ 
-           revenues: mapAmounts(s.splData.revenues), 
-           cogs: mapAmounts(s.splData.cogs), 
-           expenses: mapAmounts(s.splData.expenses), 
-           oci: mapAmounts(s.splData.oci) 
-        });
-        
-        if (s.sceData) setSceData({ 
-           beginningCapital: s.sceData.beginningCapital || { [s.year1||'2024']: s.sceData.beginningCapital1, [s.year2||'2023']: s.sceData.beginningCapital2 }, 
-           investments: mapAmounts(s.sceData.investments), 
-           dividends: mapAmounts(s.sceData.dividends) 
-        });
-        
-        if (s.bsData) setBsData({ 
-           currentAssets: mapAmounts(s.bsData.currentAssets), 
-           nonCurrentAssets: mapAmounts(s.bsData.nonCurrentAssets), 
-           currentLiabilities: mapAmounts(s.bsData.currentLiabilities), 
-           nonCurrentLiabilities: mapAmounts(s.bsData.nonCurrentLiabilities) 
-        });
-        
-        if (s.cfData) setCfData({ 
-           beginningCash: s.cfData.beginningCash || { [s.year1||'2024']: s.cfData.beginningCash1, [s.year2||'2023']: s.cfData.beginningCash2 }, 
-           operating: mapAmounts(s.cfData.operating), 
-           investing: mapAmounts(s.cfData.investing), 
-           financing: mapAmounts(s.cfData.financing) 
-        });
-        
-        if (s.ratioData) setRatioData({ 
-           initialInvestment: s.ratioData.initialInvestment || { [s.year1||'2024']: s.ratioData.initialInvestment1, [s.year2||'2023']: s.ratioData.initialInvestment2 } 
-        });
-        
-        if(s.taxLedger) setTaxLedger(s.taxLedger);
-        if(s.incomeTaxTable) setIncomeTaxTable(s.incomeTaxTable);
-        if(s.flatTaxRates) setFlatTaxRates(s.flatTaxRates);
-        if(s.payrollConfig) setPayrollConfig(s.payrollConfig);
-        if(s.payrollCols) setPayrollCols(s.payrollCols);
-        if(s.employees) setEmployees(s.employees);
-        if(s.costingData) setCostingData(s.costingData);
-        if(s.savedProducts) setSavedProducts(s.savedProducts);
-        if(s.forecastPeriods) setForecastPeriods(s.forecastPeriods);
-        if(s.forecastItems) setForecastItems(s.forecastItems);
-        if(s.deprState) setDeprState(s.deprState);
-        if(s.deprSchedule) setDeprSchedule(s.deprSchedule);
-        if(s.notesText) setNotesText(s.notesText);
-        
-        alert("Session Backup loaded successfully! All figures have been restored.");
+        // FORCE INSTANT CLOUD SYNC FOR TEAMMATES
+        if (db && user) {
+           const workspaceId = loginName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+           const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appStates', workspaceId);
+           setDoc(stateRef, {
+             state: mappedState,
+             lastEditor: `${user.uid}_${deviceId.current}`,
+             editorName: loginName,
+             timestamp: Date.now()
+           }).catch(console.error);
+        }
+
+        alert("Session Backup loaded successfully! All figures have been restored and synced across all tabs.");
       } catch(err) { 
         alert("Error loading file. Make sure it is a valid .xeia backup file."); 
       }
@@ -938,63 +967,79 @@ export default function App() {
 
   // --- CLEAR DATA LOGIC ---
   const handleClearData = () => {
-    if (window.confirm("Are you sure you want to clear all data? This will reset all financial amounts and remove custom line items, employees, taxes, and records. Make sure you have a backup saved!")) {
-      setSplData({
-        revenues: [{ id: 1, name: 'Sales Revenue', amounts: {} }, { id: 2, name: 'Service Revenue', amounts: {} }],
-        cogs: [{ id: 1, name: 'Cost of Goods Sold', amounts: {} }],
-        expenses: [{ id: 1, name: 'Salaries Expense', amounts: {} }, { id: 2, name: 'Rent Expense', amounts: {} }],
-        oci: []
-      });
-      setSceData({
-        beginningCapital: {},
-        investments: [],
-        dividends: []
-      });
-      setBsData({
-        currentAssets: [
-          { id: 1, name: 'Short-term investments', amounts: {} },
-          { id: 2, name: 'Receivables and contract assets', amounts: {} },
-          { id: 3, name: 'Inventories', amounts: {} }
-        ],
-        nonCurrentAssets: [
-          { id: 1, name: 'Property, plant and equipment', amounts: {} },
-          { id: 2, name: 'Right-of-use assets', amounts: {} }
-        ],
-        currentLiabilities: [
-          { id: 1, name: 'Trade payables and contract liabilities', amounts: {} },
-          { id: 2, name: 'Short-term debt', amounts: {} }
-        ],
-        nonCurrentLiabilities: [
-          { id: 1, name: 'Senior debt securities', amounts: {} },
-          { id: 2, name: 'Lease liabilities', amounts: {} }
-        ],
-      });
-      setCfData({
-        beginningCash: {},
-        operating: [],
-        investing: [],
-        financing: []
-      });
-      setRatioData({ initialInvestment: {} });
-      setTaxLedger([]);
-      setTaxBasisInput(0);
-      setVatSales(0);
-      setVatPurchases(0);
-      setEmployees([]);
-      setSavedProducts([]);
-      setCostingData({
-        productId: `PROD-${Date.now().toString().slice(-5)}`, 
-        productName: 'New Product', 
-        productDescription: '',
-        materials: [],
-        labor: [],
-        overhead: []
-      });
-      setForecastItems([]);
-      setDeprState({ assetName: '', cost: 0, salvage: 0, life: 5, method: 'Straight Line' });
-      setDeprSchedule([]);
-      setNotesText('');
-      alert("All placeholder data has been cleared! You have a clean sheet.");
+    if (window.confirm("Are you sure you want to clear all data? This will completely reset all financial amounts, taxes, employees, and custom line items. Ensure you have saved a backup first!")) {
+      
+      const emptyState = {
+        companyName: '',
+        dbaName: '',
+        isConsolidated: true,
+        isComparisonMode: true,
+        currency: 'PHP',
+        periods: ['2023', '2024'],
+        activePeriod: '2024',
+        comparePeriod: '2023',
+        splData: { revenues: [], cogs: [], expenses: [], oci: [] },
+        sceData: { beginningCapital: {}, investments: [], dividends: [] },
+        bsData: { currentAssets: [], nonCurrentAssets: [], currentLiabilities: [], nonCurrentLiabilities: [] },
+        cfData: { beginningCash: {}, operating: [], investing: [], financing: [] },
+        ratioData: { initialInvestment: {} },
+        taxLedger: [],
+        incomeTaxTable: incomeTaxTable, 
+        flatTaxRates: flatTaxRates, 
+        vatSales: 0,
+        vatPurchases: 0,
+        taxBasisInput: 0,
+        selectedFlatTax: '',
+        payrollConfig: { workDaysPerMonth: 22, hoursPerDay: 8, payBasis: 'Monthly', ndMultiplier: 0.10 },
+        payrollCols: { earnings: [], deductions: [] },
+        employees: [],
+        costingData: {
+            productId: `PROD-${Date.now().toString().slice(-5)}`, 
+            productName: 'New Product', 
+            productDescription: '',
+            materials: [], labor: [], overhead: []
+        },
+        savedProducts: [],
+        forecastPeriods: ['Jul-16', 'Aug-16', 'Sep-16'],
+        forecastItems: [],
+        deprState: { assetName: '', cost: 0, salvage: 0, life: 5, method: 'Straight Line' },
+        deprSchedule: [],
+        notesText: ''
+      };
+
+      setCompanyName(emptyState.companyName);
+      setDbaName(emptyState.dbaName);
+      setSplData(emptyState.splData);
+      setSceData(emptyState.sceData);
+      setBsData(emptyState.bsData);
+      setCfData(emptyState.cfData);
+      setRatioData(emptyState.ratioData);
+      setTaxLedger(emptyState.taxLedger);
+      setTaxBasisInput(emptyState.taxBasisInput);
+      setVatSales(emptyState.vatSales);
+      setVatPurchases(emptyState.vatPurchases);
+      setEmployees(emptyState.employees);
+      setPayrollCols(emptyState.payrollCols);
+      setSavedProducts(emptyState.savedProducts);
+      setCostingData(emptyState.costingData);
+      setForecastItems(emptyState.forecastItems);
+      setDeprState(emptyState.deprState);
+      setDeprSchedule(emptyState.deprSchedule);
+      setNotesText(emptyState.notesText);
+
+      // FORCE INSTANT CLOUD SYNC FOR TEAMMATES
+      if (db && user) {
+         const workspaceId = loginName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+         const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appStates', workspaceId);
+         setDoc(stateRef, {
+           state: emptyState,
+           lastEditor: `${user.uid}_${deviceId.current}`,
+           editorName: loginName,
+           timestamp: Date.now()
+         }).catch(console.error);
+      }
+
+      alert("All data has been cleared! You now have a clean sheet.");
     }
   };
 
