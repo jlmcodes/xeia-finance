@@ -141,9 +141,47 @@ const SectionHeader = ({ title, isDarkMode }) => (
 );
 
 const DynamicList = ({ items, category, setState, isDeductible = false, currencySymbolStr, activePeriod, comparePeriod, isComparisonMode }) => {
+  // Handle Auto-Merging of Accounts
+  const handleNameBlur = (id, value) => {
+    setState(prev => {
+      const arr = [...prev[category]];
+      const currentIdx = arr.findIndex(i => i.id === id);
+      if (currentIdx === -1 || !value.trim()) return prev;
+      
+      const duplicateIdx = arr.findIndex(i => i.id !== id && i.name && i.name.toLowerCase() === value.toLowerCase().trim());
+      if (duplicateIdx !== -1) {
+         const duplicate = arr[duplicateIdx];
+         const current = arr[currentIdx];
+         arr[duplicateIdx] = { ...duplicate, amounts: { ...duplicate.amounts, ...current.amounts } };
+         arr.splice(currentIdx, 1);
+         return { ...prev, [category]: arr };
+      }
+      return prev;
+    });
+  };
+
+  // Filter hidden rows & keep clean views per period
+  let visibleItems = items.filter(item => {
+     const v1 = item.amounts?.[activePeriod];
+     const v2 = isComparisonMode ? item.amounts?.[comparePeriod] : undefined;
+     const hasV1 = v1 !== undefined && v1 !== 0 && v1 !== '';
+     const hasV2 = v2 !== undefined && v2 !== 0 && v2 !== '';
+     const hasAnyVal = Object.values(item.amounts || {}).some(v => v !== 0 && v !== undefined && v !== '');
+     
+     // Only show items with data in the CURRENT viewed periods, or newly added ones that have NO data anywhere yet.
+     return hasV1 || hasV2 || !hasAnyVal;
+  });
+
+  // Auto-Sort Descending based on the Active Period's Absolute Value
+  visibleItems.sort((a, b) => {
+     const aVal = Number(a.amounts?.[activePeriod]) || 0;
+     const bVal = Number(b.amounts?.[activePeriod]) || 0;
+     return Math.abs(bVal) - Math.abs(aVal); 
+  });
+
   return (
     <div className="space-y-1 mb-4">
-      {items.map((item, index) => {
+      {visibleItems.map((item, index) => {
          const val1 = item.amounts?.[activePeriod] || 0;
          const val2 = item.amounts?.[comparePeriod] || 0;
          
@@ -153,6 +191,7 @@ const DynamicList = ({ items, category, setState, isDeductible = false, currency
               type="text"
               value={item.name ?? ''}
               onChange={(e) => handleNameChange(setState, category, item.id, e.target.value)}
+              onBlur={(e) => handleNameBlur(item.id, e.target.value)}
               className={`flex-1 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blueJeans focus:outline-none transition-colors text-sm dark:text-slate-200`}
               placeholder="Line Item Name"
             />
@@ -276,8 +315,11 @@ const CurrencyInput = ({ value, onChange, currencySymbol, showSymbol = true, isD
     setLocalStr(finalStr);
   };
 
-  const handleFocus = () => {
+  const handleFocus = (e) => {
     setIsFocused(true);
+    if (e && e.target) {
+      setTimeout(() => e.target.select(), 0);
+    }
     if (value === 0 || value === null || value === undefined) {
        setLocalStr('');
        return;
@@ -673,7 +715,7 @@ export default function App() {
     const stateRef = doc(db, 'artifacts', appId, 'public', 'data', 'appStates', workspaceId);
     
     const unsubState = onSnapshot(stateRef, (docSnap) => {
-      hasLoadedInitialData.current = true; // Mark that initial load is verified
+      hasLoadedInitialData.current = true; // Fixes the overwrite bug upon join
       
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -1432,7 +1474,7 @@ export default function App() {
     }
   };
 
-  // --- EXCEL EXPORT LOGIC (Dynamic Multi-Period) ---
+  // --- EXCEL EXPORT LOGIC (Comprehensive Compilation) ---
   const exportToExcel = async () => {
     try {
       setIsExportingExcel(true);
@@ -1518,7 +1560,7 @@ export default function App() {
         return sheet;
       };
 
-      // SPL Sheet
+      // 1. SPL Sheet
       const splSheet = setupSheet('Comprehensive Income', 'STATEMENT OF COMPREHENSIVE INCOME');
       let r = writeSection(splSheet, 'REVENUES', splData.revenues, 8);
       writeStyledTotal(splSheet, r.nextRow, 'Total Revenues', r.formulas);
@@ -1544,8 +1586,8 @@ export default function App() {
       const compFormulas = periods.map((_, i) => `${String.fromCharCode(66+i)}${niRow}+${String.fromCharCode(66+i)}${oci.nextRow}`);
       writeStyledTotal(splSheet, compIncRow, 'COMPREHENSIVE INCOME', compFormulas, true);
 
-      // SCE Sheet
-      const sceSheet = setupSheet('Changes in Equity', 'STATEMENT OF Changes in Equity');
+      // 2. SCE Sheet
+      const sceSheet = setupSheet('Changes in Equity', 'STATEMENT OF CHANGES IN EQUITY');
       sceSheet.getCell('A8').value = 'Beginning Capital Balance';
       periods.forEach((p, i) => { 
         sceSheet.getCell(8, i+2).value = Number(financials[p]?.begCap) || 0; 
@@ -1571,7 +1613,7 @@ export default function App() {
       });
       writeStyledTotal(sceSheet, eqRow, 'ENDING CAPITAL (EQUITY)', eqFormulas, true);
 
-      // CF Sheet
+      // 3. CF Sheet
       const cfSheet = setupSheet('Cash Flows', 'STATEMENT OF CASH FLOWS');
       cfSheet.getCell('A8').value = 'Beginning Cash Balance';
       periods.forEach((p, i) => { 
@@ -1612,7 +1654,7 @@ export default function App() {
       const endCashFormulas = periods.map((_, i) => `${String.fromCharCode(66+i)}8+${String.fromCharCode(66+i)}${netCashRow}`);
       writeStyledTotal(cfSheet, endCashRow, 'ENDING CASH BALANCE', endCashFormulas, true);
 
-      // BS Sheet
+      // 4. BS Sheet
       const bsSheet = setupSheet('Financial Position', 'STATEMENT OF FINANCIAL POSITION');
       bsSheet.getCell('A8').value = 'ASSETS'; 
       bsSheet.getCell('A8').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
@@ -1620,6 +1662,7 @@ export default function App() {
       bsSheet.getCell('A9').value = 'Cash & Equivalents';
       periods.forEach((p, i) => { 
         bsSheet.getCell(9, i+2).value = { formula: `'Cash Flows'!${String.fromCharCode(66+i)}${endCashRow}` }; 
+        bsSheet.getCell(9, i+2).numFmt = '#,##0.00;[Red](#,##0.00)';
       });
       
       let ca = writeSection(bsSheet, 'CURRENT ASSETS', bsData.currentAssets, 10);
@@ -1651,13 +1694,141 @@ export default function App() {
       bsSheet.getCell(`A${eqBsRow}`).value = 'Total Capital / Retained Earnings';
       periods.forEach((p, i) => { 
         bsSheet.getCell(eqBsRow, i+2).value = { formula: `'Changes in Equity'!${String.fromCharCode(66+i)}${eqRow}` }; 
+        bsSheet.getCell(eqBsRow, i+2).numFmt = '#,##0.00;[Red](#,##0.00)';
       });
       
       const tleRow = eqBsRow + 2;
       const tleFormulas = periods.map((_, i) => `${String.fromCharCode(66+i)}${totLiabRow}+${String.fromCharCode(66+i)}${eqBsRow}`);
       writeStyledTotal(bsSheet, tleRow, 'TOTAL LIABILITIES & EQUITY', tleFormulas, true);
 
-      // (Other exports like Tax and Payroll remain functionally isolated to their specific use cases)
+      // 5. Analysis & Ratios Sheet
+      const ratioSheet = wb.addWorksheet('Analysis & Ratios');
+      ratioSheet.columns = [{ width: 40 }, ...periods.map(()=>({width: 20}))];
+      styleHeader(ratioSheet.getCell('A1'), companyName, true);
+      ratioSheet.getCell('A3').value = 'FINANCIAL ANALYSIS & RATIOS';
+      ratioSheet.getCell('A3').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      
+      const rHeader = ratioSheet.getRow(5);
+      rHeader.getCell(1).value = 'Metric / Indicator';
+      periods.forEach((p, idx) => { rHeader.getCell(idx + 2).value = p; });
+      rHeader.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF214573' } }; });
+      
+      let rRow = 6;
+      const ratioMetrics = [
+        { label: 'Current Ratio (x)', calc: (p) => financials[p]?.ca / financials[p]?.cl },
+        { label: 'Debt to Equity (x)', calc: (p) => financials[p]?.tl / financials[p]?.endEq },
+        { label: 'Net Profit Margin (%)', calc: (p) => (financials[p]?.ni / financials[p]?.rev) * 100 },
+        { label: 'Return on Assets (%)', calc: (p) => (financials[p]?.ni / financials[p]?.ta) * 100 },
+        { label: 'Return on Investment (%)', calc: (p) => (financials[p]?.ni / ratioData.initialInvestment?.[p]) * 100 },
+        { label: 'Payback Period (Yrs)', calc: (p) => ratioData.initialInvestment?.[p] / financials[p]?.opCF }
+      ];
+      ratioMetrics.forEach(metric => {
+        ratioSheet.getCell(`A${rRow}`).value = metric.label;
+        periods.forEach((p, idx) => {
+           const val = metric.calc(p);
+           const cell = ratioSheet.getCell(rRow, idx + 2);
+           cell.value = isFinite(val) ? val : 0;
+           cell.numFmt = '#,##0.00';
+        });
+        rRow++;
+      });
+
+      // 6. Tax Ledger Sheet
+      const taxSheet = wb.addWorksheet('Tax Ledger');
+      taxSheet.columns = [{ width: 40 }, { width: 35 }, { width: 20 }, { width: 20 }];
+      styleHeader(taxSheet.getCell('A1'), companyName, true);
+      taxSheet.getCell('A3').value = 'GLOBAL TAX LEDGER';
+      taxSheet.getCell('A3').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      const tHeader = taxSheet.getRow(5);
+      tHeader.values = ['Tax Name', 'Rate / Method', 'Tax Basis', 'Computed Tax'];
+      tHeader.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF214573' } }; });
+      let tRow = 6;
+      taxLedger.forEach(t => {
+          taxSheet.getRow(tRow).values = [t.name, t.rateStr, t.basis, t.computed];
+          taxSheet.getCell(`C${tRow}`).numFmt = '#,##0.00';
+          taxSheet.getCell(`D${tRow}`).numFmt = '#,##0.00';
+          tRow++;
+      });
+
+      // 7. Payroll Sheet
+      const paySheet = wb.addWorksheet('Payroll');
+      paySheet.columns = [{ width: 30 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }];
+      styleHeader(paySheet.getCell('A1'), companyName, true);
+      paySheet.getCell('A3').value = 'PAYROLL REGISTER';
+      paySheet.getCell('A3').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      const pHead = paySheet.getRow(5);
+      pHead.values = ['Employee Name', 'Base Pay', 'OT Pay', 'ND Pay', 'Gross Pay', 'SSS', 'PhilHealth', 'Pag-IBIG', 'WHT', 'Net Pay'];
+      pHead.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF214573' } }; });
+      let pRow = 6;
+      employees.forEach(emp => {
+         const customEarn = Object.values(emp.earnings || {}).reduce((a,b)=>a+(Number(b)||0),0);
+         const gross = emp.basePay + emp.otPay + emp.ndPay + customEarn;
+         const customDed = Object.values(emp.deductions || {}).reduce((a,b)=>a+(Number(b)||0),0);
+         const stat = emp.sss + emp.philhealth + emp.pagibig + emp.withholding;
+         const net = gross - stat - customDed;
+         paySheet.getRow(pRow).values = [emp.name, emp.basePay, emp.otPay, emp.ndPay, gross, emp.sss, emp.philhealth, emp.pagibig, emp.withholding, net];
+         for(let i=2; i<=10; i++) paySheet.getCell(pRow, i).numFmt = '#,##0.00';
+         pRow++;
+      });
+
+      // 8. Product Costing Sheet
+      const costSheet = wb.addWorksheet('Product Costing');
+      costSheet.columns = [{ width: 25 }, { width: 40 }];
+      styleHeader(costSheet.getCell('A1'), companyName, true);
+      costSheet.getCell('A3').value = 'ACTIVE PRODUCT COSTING';
+      costSheet.getCell('A3').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      costSheet.getCell('A5').value = 'Product ID:'; costSheet.getCell('B5').value = costingData.productId;
+      costSheet.getCell('A6').value = 'Product Name:'; costSheet.getCell('B6').value = costingData.productName;
+      costSheet.getCell('A7').value = 'Total Production Cost:'; costSheet.getCell('B7').value = grandTotalProductionCost;
+      costSheet.getCell('B7').numFmt = '#,##0.00';
+      costSheet.getCell('B7').font = { bold: true };
+
+      // 9. Sales Forecast Sheet
+      const fcastSheet = wb.addWorksheet('Sales Forecast');
+      fcastSheet.columns = [{ width: 30 }, ...forecastPeriods.map(()=>({width: 15})), { width: 20 }];
+      styleHeader(fcastSheet.getCell('A1'), companyName, true);
+      fcastSheet.getCell('A3').value = 'SALES FORECAST';
+      fcastSheet.getCell('A3').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      const fHead = fcastSheet.getRow(5);
+      fHead.getCell(1).value = 'Product Name';
+      forecastPeriods.forEach((p, i) => fHead.getCell(i+2).value = p);
+      fHead.getCell(forecastPeriods.length+2).value = 'Total Sales';
+      fHead.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF214573' } }; });
+      let fRow = 6;
+      forecastItems.forEach(item => {
+         const row = fcastSheet.getRow(fRow);
+         row.getCell(1).value = item.name;
+         let tot = 0;
+         forecastPeriods.forEach((p, i) => {
+            const val = (item.periods[p]?.price || 0) * (item.periods[p]?.qty || 0);
+            row.getCell(i+2).value = val;
+            row.getCell(i+2).numFmt = '#,##0.00';
+            tot += val;
+         });
+         row.getCell(forecastPeriods.length+2).value = tot;
+         row.getCell(forecastPeriods.length+2).numFmt = '#,##0.00';
+         row.getCell(forecastPeriods.length+2).font = { bold: true };
+         fRow++;
+      });
+
+      // 10. Depreciation Sheet
+      const deprSheet = wb.addWorksheet('Depreciation');
+      deprSheet.columns = [{ width: 10 }, { width: 20 }, { width: 20 }, { width: 20 }, { width: 20 }, { width: 20 }];
+      styleHeader(deprSheet.getCell('A1'), companyName, true);
+      deprSheet.getCell('A3').value = 'ACTIVE DEPRECIATION SCHEDULE';
+      deprSheet.getCell('A3').font = { bold: true, size: 12, color: { argb: 'FFEDA340' } };
+      deprSheet.getCell('A5').value = 'Asset Name:'; deprSheet.getCell('B5').value = deprState.assetName;
+      deprSheet.getCell('A6').value = 'Acquisition Cost:'; deprSheet.getCell('B6').value = deprState.cost;
+      deprSheet.getCell('B6').numFmt = '#,##0.00';
+      const dHead = deprSheet.getRow(8);
+      dHead.values = ['Year', 'Beg. Book Value', 'Depr. Expense', 'Accum. Depr.', 'End Book Value', 'Target Period'];
+      dHead.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF214573' } }; });
+      let dRow = 9;
+      deprSchedule.forEach(r => {
+         deprSheet.getRow(dRow).values = [r.year, r.begBV, r.exp, r.accDepr, r.endBV, r.targetPeriod];
+         for(let i=2; i<=5; i++) deprSheet.getCell(dRow, i).numFmt = '#,##0.00';
+         dRow++;
+      });
       
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -1793,7 +1964,7 @@ export default function App() {
         )}
 
         {/* --- FLOATING PERIOD MANAGER & NOTES PANEL --- */}
-        <div className={`fixed top-24 right-0 h-[70vh] bg-white dark:bg-slate-800 shadow-[0_0_15px_rgba(0,0,0,0.1)] border-l border-y border-slate-200 dark:border-slate-700 transition-transform duration-300 z-40 rounded-l-xl flex flex-col ${isNotesOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: '320px' }}>
+        <div className={`fixed top-24 right-0 h-[85vh] bg-white dark:bg-slate-800 shadow-[0_0_15px_rgba(0,0,0,0.1)] border-l border-y border-slate-200 dark:border-slate-700 transition-transform duration-300 z-40 rounded-l-xl flex flex-col ${isNotesOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: '450px' }}>
           <div className="flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-tl-xl">
              <span className="font-bold text-sm flex items-center gap-2 text-blueVelvet dark:text-goldenYellow">
                <Archive size={16}/> Periods & Notes
@@ -1841,7 +2012,7 @@ export default function App() {
             <textarea 
               value={notesText} 
               onChange={e => setNotesText(e.target.value)} 
-              className="w-full flex-1 p-3 resize-none bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-600 rounded focus:outline-none text-sm dark:text-slate-200" 
+              className="w-full flex-1 p-3 resize-none bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-600 rounded focus:outline-none text-sm dark:text-slate-200 min-h-[250px]" 
               placeholder="Jot down assumptions, goal changes, or target figures here. This data saves with your backup file and syncs with your team."
             ></textarea>
           </div>
@@ -2877,6 +3048,7 @@ export default function App() {
                                     <td className="px-3 py-1">
                                       <input 
                                         type="number" 
+                                        onFocus={(e) => e.target.select()}
                                         value={row.excessRate ?? 0} 
                                         onChange={(e) => {
                                             const newTable = [...incomeTaxTable];
@@ -2931,6 +3103,7 @@ export default function App() {
                                 <div className="flex items-center gap-2">
                                   <input 
                                     type="number" 
+                                    onFocus={(e) => e.target.select()}
                                     value={rate.rate ?? 0} 
                                     onChange={(e) => {
                                       const newRates = {...flatTaxRates};
@@ -3088,6 +3261,7 @@ export default function App() {
                     Work Days/Month: 
                     <input 
                       type="number" 
+                      onFocus={(e) => e.target.select()}
                       value={payrollConfig.workDaysPerMonth ?? 0} 
                       onChange={e => setPayrollConfig({...payrollConfig, workDaysPerMonth: Number(e.target.value)})} 
                       className="w-16 bg-transparent border border-slate-300 dark:border-slate-600 rounded px-2 py-1" 
@@ -3097,6 +3271,7 @@ export default function App() {
                     Hours/Day: 
                     <input 
                       type="number" 
+                      onFocus={(e) => e.target.select()}
                       value={payrollConfig.hoursPerDay ?? 0} 
                       onChange={e => setPayrollConfig({...payrollConfig, hoursPerDay: Number(e.target.value)})} 
                       className="w-16 bg-transparent border border-slate-300 dark:border-slate-600 rounded px-2 py-1" 
@@ -3107,6 +3282,7 @@ export default function App() {
                     <input 
                       type="number" 
                       step="0.01" 
+                      onFocus={(e) => e.target.select()}
                       value={payrollConfig.ndMultiplier ?? 0} 
                       onChange={e => setPayrollConfig({...payrollConfig, ndMultiplier: Number(e.target.value)})} 
                       className="w-20 bg-transparent border border-slate-300 dark:border-slate-600 rounded px-2 py-1" 
@@ -3359,6 +3535,7 @@ export default function App() {
                       <div className="flex gap-1">
                         <input 
                           type="number" 
+                          onFocus={(e) => e.target.select()}
                           placeholder="Hrs" 
                           title="OT Hours" 
                           value={calcState.otHours ?? 0} 
@@ -3381,6 +3558,7 @@ export default function App() {
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">ND Hrs</label>
                       <input 
                         type="number" 
+                        onFocus={(e) => e.target.select()}
                         placeholder="Hrs" 
                         value={calcState.ndHours ?? 0} 
                         onChange={e => setCalcState({...calcState, ndHours: Number(e.target.value)})} 
@@ -3681,6 +3859,7 @@ export default function App() {
                                  <td className="px-4 py-2 text-right">
                                    <input 
                                      type="number" 
+                                     onFocus={(e) => e.target.select()}
                                      value={mat.qty} 
                                      onChange={e => setCostingData({...costingData, materials: costingData.materials.map(m => m.id===mat.id ? {...m, qty: Number(e.target.value)} : m)})} 
                                      className="w-full text-right bg-transparent border-b border-transparent focus:border-emerald-500 focus:outline-none font-mono"
@@ -3748,6 +3927,7 @@ export default function App() {
                                  <td className="px-4 py-2 text-right">
                                    <input 
                                      type="number" 
+                                     onFocus={(e) => e.target.select()}
                                      value={lab.hours} 
                                      onChange={e => setCostingData({...costingData, labor: costingData.labor.map(l => l.id===lab.id ? {...l, hours: Number(e.target.value)} : l)})} 
                                      className="w-full text-right bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none font-mono"
@@ -4006,6 +4186,7 @@ export default function App() {
                                           <span className="text-slate-500">UNITS</span>
                                           <input 
                                             type="number" 
+                                            onFocus={(e) => e.target.select()}
                                             value={item.periods[p]?.qty || 0} 
                                             onChange={e => setForecastItems(forecastItems.map(i => i.id === item.id ? {...i, periods: {...i.periods, [p]: {...i.periods[p], qty: Number(e.target.value)}}} : i))} 
                                             className="w-20 text-right bg-transparent focus:outline-none border-b border-transparent focus:border-blueJeans font-mono" 
@@ -4123,6 +4304,7 @@ export default function App() {
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Useful Life (Years)</label>
                          <input 
                            type="number" 
+                           onFocus={(e) => e.target.select()}
                            value={deprState.life} 
                            onChange={e => setDeprState({...deprState, life: Number(e.target.value)})} 
                            className="w-full bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded px-3 py-2 text-sm focus:outline-blue-500 font-mono" 
